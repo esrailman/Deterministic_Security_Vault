@@ -71,7 +71,8 @@ header {
     max-width: 1000px;
     margin: 2rem auto;
     padding: 20px;
-    flex: 1; /* Pushes footer down */
+    flex: 1;
+    /* Pushes footer down */
 }
 
 .card {
@@ -82,7 +83,8 @@ header {
     margin-bottom: 20px;
 }
 
-h1, h2 {
+h1,
+h2 {
     color: var(--primary-color);
     margin-bottom: 1rem;
 }
@@ -134,25 +136,64 @@ textarea {
 }
 
 /* Feedback & Alerts */
+/* Badges */
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--white);
+    display: inline-block;
+}
+
+.badge-success {
+    background-color: var(--success-color);
+}
+
+.badge-error {
+    background-color: var(--error-color);
+}
+
+/* Button Sizes */
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 0.9rem;
+}
+
+/* Feedback & Alerts */
 .feedback {
     margin-top: 1rem;
     padding: 1rem;
     border-radius: 4px;
-    display: none; /* Hidden by default */
+    display: none;
+    /* Hidden by default */
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .feedback.success {
     display: block;
     background-color: #d4edda;
     color: #155724;
-    border: 1px solid #c3e6cb;
+    border-left: 5px solid var(--success-color);
 }
 
 .feedback.error {
     display: block;
     background-color: #f8d7da;
     color: #721c24;
-    border: 1px solid #f5c6cb;
+    border-left: 5px solid var(--error-color);
 }
 
 /* Tables */
@@ -162,7 +203,8 @@ table {
     margin-top: 1rem;
 }
 
-th, td {
+th,
+td {
     padding: 12px;
     text-align: left;
     border-bottom: 1px solid #ddd;

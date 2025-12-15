@@ -37,6 +37,7 @@
                         <th>File Name</th>
                         <th>Status</th>
                         <th>Hash ID (truncated)</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="auditTableBody">
@@ -46,29 +47,37 @@
                         <td>2025-12-16 10:45:01</td>
                         <td>Upload</td>
                         <td>financial_report_q3.pdf</td>
-                        <td style="color: green; font-weight: bold;">Success</td>
+                        <td><span class="badge badge-success">Success</span></td>
                         <td>0x7f8a...9b1</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x7f8a...9b1')">Show
+                                Proof</button></td>
                     </tr>
                     <tr>
                         <td>2025-12-16 10:48:22</td>
                         <td>Verify</td>
                         <td>financial_report_q3.pdf</td>
-                        <td style="color: green; font-weight: bold;">Valid</td>
+                        <td><span class="badge badge-success">Valid</span></td>
                         <td>0x7f8a...9b1</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x7f8a...9b1')">Show
+                                Proof</button></td>
                     </tr>
                     <tr>
                         <td>2025-12-16 11:15:05</td>
                         <td>Upload</td>
                         <td>user_list_backup.csv</td>
-                        <td style="color: green; font-weight: bold;">Success</td>
+                        <td><span class="badge badge-success">Success</span></td>
                         <td>0x3c2d...4e5</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x3c2d...4e5')">Show
+                                Proof</button></td>
                     </tr>
                     <tr>
                         <td>2025-12-16 11:20:10</td>
                         <td>Verify</td>
                         <td>unknown_file.txt</td>
-                        <td style="color: red; font-weight: bold;">Tampered</td>
+                        <td><span class="badge badge-error">Tampered</span></td>
                         <td>0x1a2b...3c4</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x1a2b...3c4')">Show
+                                Proof</button></td>
                     </tr>
                 </tbody>
             </table>

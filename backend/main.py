@@ -6,7 +6,15 @@ from backend.schemas import AuditResponse, RecordOut, RegisterRequest
 from backend.database import insert_record, get_last_record
 # from CryptoModule.verify_util import verify_signature  # Sprint-4 TODO
 
-app = FastAPI()
+app = FastAPI(
+    title="Deterministic Security Vault API",
+    description="Deterministic security API providing file integrity via Merkle Tree and Hash Chain.",
+    version="1.0.0",
+    openapi_tags=[
+        {"name": "Register", "description": "File registration and hashing operations"},
+        {"name": "Audit", "description": "Chain validation and audit logs"},
+    ]
+)
 
 # Veritabanı başlatma
 init_db()

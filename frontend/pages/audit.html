@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Log - Deterministic Security Vault</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+
+<body>
+
+    <header>
+        <div class="navbar">
+            <a href="../index.html" class="logo">Security Vault</a>
+            <ul class="nav-links">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="upload.html">Upload</a></li>
+                <li><a href="verify.html">Verify</a></li>
+                <li><a href="audit.html" class="active">Audit</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h1>System Audit Log</h1>
+            <p>View the immutable history of all file registrations and verifications.</p>
+
+            <br>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Event Type</th>
+                        <th>File Name</th>
+                        <th>Status</th>
+                        <th>Hash ID (truncated)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                    <!-- Javascript will populate this, or we can hardcode for now -->
+                    <!-- Hardcoded mock data for minimal dependencies -->
+                    <tr>
+                        <td>2025-12-16 10:45:01</td>
+                        <td>Upload</td>
+                        <td>financial_report_q3.pdf</td>
+                        <td><span class="badge badge-success">Success</span></td>
+                        <td>0x7f8a...9b1</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x7f8a...9b1')">Show
+                                Proof</button></td>
+                    </tr>
+                    <tr>
+                        <td>2025-12-16 10:48:22</td>
+                        <td>Verify</td>
+                        <td>financial_report_q3.pdf</td>
+                        <td><span class="badge badge-success">Valid</span></td>
+                        <td>0x7f8a...9b1</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x7f8a...9b1')">Show
+                                Proof</button></td>
+                    </tr>
+                    <tr>
+                        <td>2025-12-16 11:15:05</td>
+                        <td>Upload</td>
+                        <td>user_list_backup.csv</td>
+                        <td><span class="badge badge-success">Success</span></td>
+                        <td>0x3c2d...4e5</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x3c2d...4e5')">Show
+                                Proof</button></td>
+                    </tr>
+                    <tr>
+                        <td>2025-12-16 11:20:10</td>
+                        <td>Verify</td>
+                        <td>unknown_file.txt</td>
+                        <td><span class="badge badge-error">Tampered</span></td>
+                        <td>0x1a2b...3c4</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="showProof('0x1a2b...3c4')">Show
+                                Proof</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Deterministic Security Vault Team. Sprint 3 Mockup.</p>
+    </footer>
+
+    <script src="../assets/js/script.js"></script>
+
+</body>
+
+</html>

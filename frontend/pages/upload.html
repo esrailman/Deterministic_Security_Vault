@@ -4,17 +4,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Page</title>
-    <link rel="stylesheet" href="../assets/main.css">
+    <title>Upload File - Deterministic Security Vault</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 
 <body>
-    <h1>Upload File</h1>
-    <input type="file" id="fileInput">
-    <button onclick="uploadFile()">Upload</button>
-    <div id="message"></div>
 
-    <script src="../assets/app.js"></script>
+    <header>
+        <div class="navbar">
+            <a href="../index.html" class="logo">Security Vault</a>
+            <ul class="nav-links">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="upload.html" class="active">Upload</a></li>
+                <li><a href="verify.html">Verify</a></li>
+                <li><a href="audit.html">Audit</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h1>Secure File Upload</h1>
+            <p>Register your file to the deterministic vault to ensure its integrity.</p>
+
+            <br>
+
+            <form id="uploadForm" onsubmit="handleUpload(event)">
+                <div class="form-group">
+                    <label for="fileInput">Select File:</label>
+                    <input type="file" id="fileInput" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description (Optional):</label>
+                    <input type="text" id="description" placeholder="e.g., Q3 Financial Report">
+                </div>
+
+                <button type="submit" class="btn">Upload & Register</button>
+            </form>
+
+            <div id="uploadFeedback" class="feedback">
+                <!-- Javascript will inject content here -->
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Deterministic Security Vault Team. Sprint 3 Mockup.</p>
+    </footer>
+
+    <script src="../assets/js/script.js"></script>
 </body>
 
 </html>

@@ -4,23 +4,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verification Result</title>
-    <link rel="stylesheet" href="../assets/main.css">
+    <title>Verify File - Deterministic Security Vault</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 
 <body>
-    <h1>Verification Result</h1>
-    <div id="resultBox"></div>
-    <button onclick="window.history.back()">Back</button>
 
-    <script src="../assets/app.js"></script>
-    <script>
-        // Mock displaying result on load
-        document.addEventListener('DOMContentLoaded', () => {
-            const resultBox = document.getElementById('resultBox');
-            resultBox.innerText = "Verified"; // Mock result
-        });
-    </script>
+    <header>
+        <div class="navbar">
+            <a href="../index.html" class="logo">Security Vault</a>
+            <ul class="nav-links">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="upload.html">Upload</a></li>
+                <li><a href="verify.html" class="active">Verify</a></li>
+                <li><a href="audit.html">Audit</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h1>File Integrity Verification</h1>
+            <p>Upload a file or enter its hash to verify if it has been tampered with.</p>
+
+            <br>
+
+            <form id="verifyForm" onsubmit="handleVerify(event)">
+                <div class="form-group">
+                    <label for="verifyFileInput">Upload File to Verify:</label>
+                    <input type="file" id="verifyFileInput" required>
+                </div>
+
+                <div class="form-group">
+                    <p style="text-align: center; margin: 10px 0;">-- OR --</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="hashInput">Enter Hash ID:</label>
+                    <input type="text" id="hashInput" placeholder="e.g., 0x4f...2a">
+                </div>
+
+                <button type="submit" class="btn btn-secondary">Verify Integrity</button>
+            </form>
+
+            <div id="verifyFeedback" class="feedback">
+                <!-- Javascript will inject content here -->
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Deterministic Security Vault Team. Sprint 3 Mockup.</p>
+    </footer>
+
+    <script src="../assets/js/script.js"></script>
 </body>
 
 </html>

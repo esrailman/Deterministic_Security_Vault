@@ -4,7 +4,11 @@ from backend.database import get_records, verify_chain
 from backend.logger import logger
 from backend.schemas import AuditResponse, RecordOut, RegisterRequest
 from backend.database import insert_record, get_last_record
-# from CryptoModule.verify_util import verify_signature  # Sprint-4 TODO
+from datetime import datetime
+from fastapi import HTTPException
+from CryptoModule.verify_util import (create_canonical_message,verify_signature,)
+from CryptoModule.security_engine import SecurityVaultManager
+
 
 app = FastAPI()
 
@@ -14,20 +18,54 @@ init_db()
 @app.post("/register", response_model=RecordOut)
 def register_record(payload: RegisterRequest):
 
+    # Önceki hash (hash-chain)
     last_record = get_last_record()
     prev_hash = last_record["file_hash"] if last_record else "GENESIS"
 
+    # Timestamp TEK KAYNAK: backend
+    timestamp = datetime.utcnow().isoformat()
+
+    # Canonical message (tek format)
+    message = create_canonical_message(
+        file_name=payload.file_name,
+        file_hash=payload.file_hash,
+        prev_hash=prev_hash,
+        timestamp=timestamp
+    )
+
+    # Signature zorunlu
+    if not payload.user_key or not payload.signature:
+        raise HTTPException(
+            status_code=400,
+            detail="user_key ve signature zorunludur."
+        )
+
+    # Signature doğrulama
+    if not verify_signature(payload.user_key, message, payload.signature):
+        raise HTTPException(
+            status_code=401,
+            detail="Geçersiz signature."
+        )
+
+    # Gerçek Merkle root
+    vault = SecurityVaultManager()
+    merkle_root = vault.build_merkle_root(
+        [payload.file_hash, prev_hash]
+    )
+
+    # DB insert (timestamp ile)
     insert_record(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
         prev_hash=prev_hash,
-        user_key=payload.user_key or "unknown",
-        merkle_root="root"
+        user_key=payload.user_key,
+        merkle_root=merkle_root,
+        timestamp=timestamp
     )
 
     logger.info(f"New record registered: {payload.file_name}")
 
-
+    # Response
     r = get_last_record()
     return RecordOut(
         id=r["id"],
@@ -36,8 +74,6 @@ def register_record(payload: RegisterRequest):
         prev_hash=r["prev_hash"],
         timestamp=r["timestamp"]
     )
-
-
 
 @app.get("/ping")
 def ping():

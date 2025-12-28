@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify | Deterministic Security Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="cyber-grid-background"></div>
+    <div class="cyber-glow-overlay"></div>
+    <div class="container">
+        <!-- Header -->
+        <nav>
+            <div class="logo">
+                <h1><i class="fa-solid fa-shield-halved"></i> DS Vault</h1>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Dashboard</a>
+                <a href="upload.html" class="nav-link">Vault (Register)</a>
+                <a href="verify.html" class="nav-link active">Verify</a>
+                <a href="audit.html" class="nav-link">Audit Chain</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div style="max-width: 800px; margin: 0 auto;">
+            <div class="glass-card">
+                <h2 style="margin-bottom: 1.5rem; text-align: center; color: var(--success);">File Integrity Check</h2>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">
+                    Verify if a local file matches the immutable record in the vault.
+                </p>
+
+                <!-- Verify Area -->
+                <div class="drop-zone" id="dropZone-verify" style="border-color: rgba(0, 255, 157, 0.3);">
+                    <div class="scanner-overlay" id="scannerOverlay">
+                        <div class="scanner-beam"></div>
+                    </div>
+                    <i class="fa-solid fa-magnifying-glass-shield drop-icon" style="color: var(--success);"></i>
+                    <p style="color: var(--text-muted);">Drag & Drop file to Verify Integrity</p>
+                    <button class="btn btn-primary"
+                        style="margin-top: 1rem; font-size: 0.8rem; border-color: var(--success); color: var(--success); box-shadow: 0 0 10px rgba(0, 255, 157, 0.1);">Select
+                        File</button>
+                </div>
+
+                <!-- Result Placeholder (Hidden by default in real logic, shown here for design) -->
+                <div style="margin-top: 2rem; padding: 1.5rem; border: 1px solid rgba(0, 255, 157, 0.3); background: rgba(0, 255, 157, 0.05); border-radius: 12px; display: none;"
+                    id="verifyResult">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <i class="fa-solid fa-check-circle" style="font-size: 2rem; color: var(--success);"></i>
+                        <div>
+                            <h4 style="color: var(--success); margin-bottom: 0.25rem;">Verification Successful</h4>
+                            <p style="font-size: 0.9rem; color: var(--text-muted);">File Hash matches record
+                                <strong>#1024</strong> signed by <strong>Alice</strong>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+
+</html>

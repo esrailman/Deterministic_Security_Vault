@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Chain | Deterministic Security Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="cyber-grid-background"></div>
+    <div class="cyber-glow-overlay"></div>
+    <div class="container">
+        <!-- Header -->
+        <nav>
+            <div class="logo">
+                <h1><i class="fa-solid fa-shield-halved"></i> DS Vault</h1>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Dashboard</a>
+                <a href="upload.html" class="nav-link">Vault (Register)</a>
+                <a href="verify.html" class="nav-link">Verify</a>
+                <a href="audit.html" class="nav-link active">Audit Chain</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="glass-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div>
+                    <h2>Immutable Audit Log</h2>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Real-time hash chain records (Merkle Proofs
+                        enabled)</p>
+                </div>
+                <button class="btn btn-primary" id="btn-refresh-chain" style="font-size: 0.8rem;">
+                    <i class="fa-solid fa-rotate-right"></i> Refresh Chain
+                </button>
+            </div>
+
+            <div class="table-container">
+                <table class="glass-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Timestamp (UTC)</th>
+                            <th>Event Type</th>
+                            <th>File Name</th>
+                            <th>File Hash (SHA-256)</th>
+                            <th>Integrity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditTableBody">
+                        <!-- Mock Row 1 -->
+                        <tr>
+                            <td style="color: var(--primary-cyan);">#1024</td>
+                            <td>2025-12-28 17:42:05</td>
+                            <td><span class="status-badge status-valid"><i class="fa-solid fa-upload"></i>
+                                    Register</span></td>
+                            <td>financial_report_q4.pdf</td>
+                            <td class="hash-cell">0xa1b2...c3d4</td>
+                            <td><span class="status-badge status-success">Verified</span></td>
+                        </tr>
+                        <!-- Mock Row 2 -->
+                        <tr>
+                            <td style="color: var(--text-muted);">#1023</td>
+                            <td>2025-12-28 16:15:30</td>
+                            <td><span class="status-badge status-valid"><i class="fa-solid fa-upload"></i>
+                                    Register</span></td>
+                            <td>system_backup.iso</td>
+                            <td class="hash-cell">0x9e8f...1a2b</td>
+                            <td><span class="status-badge status-success">Verified</span></td>
+                        </tr>
+                        <!-- Mock Row 3 -->
+                        <tr>
+                            <td style="color: var(--text-muted);">#1022</td>
+                            <td>2025-12-28 14:00:12</td>
+                            <td><span class="status-badge status-valid"><i class="fa-solid fa-upload"></i>
+                                    Register</span></td>
+                            <td>contract_signed.pdf</td>
+                            <td class="hash-cell">0x77ab...cc88</td>
+                            <td><span class="status-badge status-success">Verified</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination (Visual) -->
+            <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; color: var(--text-muted);">
+                <span><i class="fa-solid fa-chevron-left"></i> Prev</span>
+                <span style="color: var(--primary-cyan);">1</span>
+                <span>2</span>
+                <span>3</span>
+                <span>Next <i class="fa-solid fa-chevron-right"></i></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+
+</html>

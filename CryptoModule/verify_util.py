@@ -1,6 +1,9 @@
 import hashlib
+import base64
 from datetime import datetime
-
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.exceptions import InvalidSignature
 
 def create_canonical_message(
     file_name: str,
@@ -9,43 +12,58 @@ def create_canonical_message(
     timestamp: str
 ) -> str:
     """
-    Sistemde imzalanacak TEK canonical mesaj formatı.
-    Format:
-    file_name|file_hash|prev_hash|timestamp
+    The SINGLE canonical message format to be signed in the system.
+    Format: file_name|file_hash|prev_hash|timestamp
     """
     return f"{file_name}|{file_hash}|{prev_hash}|{timestamp}"
 
-
-def verify_signature(
-    public_key: str,
-    message: str,
-    signature: str
-) -> bool:
+def verify_signature(public_key_pem: str, message: str, signature_b64: str) -> bool:
     """
-    Deterministic signature doğrulama (Sprint / PoC seviyesi).
-
-    expected_signature = SHA256(public_key + message)
+    Verifies signature using RSA-SHA256 (PSS Padding).
+    Fully compatible with test_integration.py and Sprint 4 standards.
     """
-    if not public_key or not signature:
+    try:
+        # 1. Load Public Key
+        public_key = serialization.load_pem_public_key(
+            public_key_pem.encode('utf-8')
+        )
+        
+        # 2. Decode Signature from Base64
+        signature_bytes = base64.b64decode(signature_b64)
+        
+        # 3. Perform Verification (RSA-PSS)
+        public_key.verify(
+            signature_bytes,
+            message.encode('utf-8'),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return True # Signature is valid if no error is raised
+    except (InvalidSignature, ValueError, Exception):
+        # Return False if signature is invalid, key is corrupt, or base64 error
         return False
-
-    expected_sig = hashlib.sha256(
-        (public_key + message).encode("utf-8")
-    ).hexdigest()
-
-    return expected_sig == signature
-
 
 def check_replay_protection(
     timestamp: str,
     window_minutes: int = 5
 ) -> bool:
     """
-    Replay attack önleme
+    Replay attack prevention: Rejects if message timestamp
+    is too old compared to server time (default 5 min).
     """
     try:
+        # Convert ISO format string to datetime object
         msg_time = datetime.fromisoformat(timestamp)
+        
+        # Calculate difference with current time (UTC)
+        # Note: datetime.utcnow() is for older versions, timezone.utc is recommended in modern python
+        # but preserving your code for consistency.
         diff_minutes = (datetime.utcnow() - msg_time).total_seconds() / 60.0
+        
+        # Valid if time difference is between 0 and window (5 min)
         return 0 <= diff_minutes < window_minutes
     except Exception:
         return False

@@ -1,12 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
+
 class RecordOut(BaseModel):
     id: int
     file_name: str
     file_hash: str
     prev_hash: str
     timestamp: str
+
 
 class AuditResponse(BaseModel):
     chain_valid: bool
@@ -17,5 +19,15 @@ class AuditResponse(BaseModel):
 class RegisterRequest(BaseModel):
     file_name: str
     file_hash: str
-    user_key: Optional[str] = None
-    signature: Optional[str] = None  
+    public_key: str        # PEM formatted public key
+    signature: str         # Base64 encoded RSA signature
+
+
+class VerifyRequest(BaseModel):
+    file_hash: str
+
+
+class VerifyResponse(BaseModel):
+    verified: bool
+    message: str
+    record: Optional[RecordOut] = None

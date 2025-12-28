@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload | Deterministic Security Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="cyber-grid-background"></div>
+    <div class="cyber-glow-overlay"></div>
+    <div class="container">
+        <!-- Header -->
+        <nav>
+            <div class="logo">
+                <h1><i class="fa-solid fa-shield-halved"></i> DS Vault</h1>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Dashboard</a>
+                <a href="upload.html" class="nav-link active">Vault (Register)</a>
+                <a href="verify.html" class="nav-link">Verify</a>
+                <a href="audit.html" class="nav-link">Audit Chain</a>
+            </div>
+        </nav>
+
+        <!-- Main Content (Centered) -->
+        <div style="max-width: 800px; margin: 0 auto;">
+            <div class="glass-card">
+                <h2 style="margin-bottom: 1.5rem; text-align: center;">Secure File Registration</h2>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">
+                    Upload a file to register its immutable signature on the hash chain.
+                </p>
+
+                <!-- Upload Area -->
+                <div class="drop-zone" id="dropZone-upload" style="margin-bottom: 2rem;">
+                    <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                    <p style="color: var(--text-muted);">Drag & Drop file to Register</p>
+                    <button class="btn btn-primary" style="margin-top: 1rem; font-size: 0.8rem;">Browse Files</button>
+                </div>
+
+                <!-- Form Fields (Visual Only for Design Phase) -->
+                <div class="form-group">
+                    <label class="form-label">User Identity Key (Public Key)</label>
+                    <input type="text" class="form-input" value="0x7f83...a1b2 (Auto-detected)" disabled
+                        style="opacity: 0.7;">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description / Notes (Optional)</label>
+                    <input type="text" class="form-input" placeholder="e.g., Q4 Financial Report - Final">
+                </div>
+
+                <div style="text-align: center; margin-top: 2rem;">
+                    <button class="btn btn-primary" id="btn-register-manual"
+                        style="width: 100%; justify-content: center; font-size: 1.1rem; opacity: 0.5; cursor: not-allowed;">
+                        <i class="fa-solid fa-fingerprint"></i> Sign & Register Record
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+
+</html>

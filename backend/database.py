@@ -102,3 +102,17 @@ def verify_chain():
             broken_records.append(current_record["id"])
 
     return len(broken_records) == 0, broken_records
+
+
+def get_record_by_hash(file_hash: str):
+    """
+    Belirtilen file_hash değerine sahip kaydı döndürür.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM records WHERE file_hash = ?", (file_hash,))
+    row = cur.fetchone()
+
+    conn.close()
+    return row

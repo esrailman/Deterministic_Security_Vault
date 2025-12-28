@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 
 class RecordOut(BaseModel):
@@ -21,3 +21,13 @@ class RegisterRequest(BaseModel):
     file_hash: str
     public_key: str        # PEM formatında public key
     signature: str         # Base64 encoded RSA signature
+
+
+class VerifyRequest(BaseModel):
+    file_hash: str
+
+
+class VerifyResponse(BaseModel):
+    verified: bool
+    message: str
+    record: Optional[RecordOut] = None

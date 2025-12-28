@@ -5,7 +5,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
-from CryptoModule.merkle_util import MerkleTree
+# MerkleTree importuna gerek kalmadı, her şey SecurityVaultManager içinde
+from CryptoModule.security_engine import SecurityVaultManager
 from CryptoModule.chain_validator import ChainValidator
 from CryptoModule.verify_util import verify_signature
 from CryptoModule.hash_util import Hasher
@@ -20,15 +21,13 @@ class TestSystemIntegrity(unittest.TestCase):
             {"id": 3, "file_hash": "ghi333", "prev_hash": "def222"}
         ]
 
-        # 2. İmza Testi İçin Geçici RSA Anahtar Çifti Oluştur (EKLENDİ)
-        # Her test çalıştığında yeni bir anahtar çifti üretilir.
+        # 2. İmza Testi İçin Geçici RSA Anahtar Çifti Oluştur
         self.private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=2048,
         )
         self.public_key = self.private_key.public_key()
         
-        # Public key'i PEM formatına (string) çevir
         self.public_key_pem = self.public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
@@ -40,9 +39,8 @@ class TestSystemIntegrity(unittest.TestCase):
         self.assertTrue(result["is_valid"])
 
     def test_tamper_detection(self):
-        """Zincir bozulduğunda algılandığını test eder (Hacking attempt)"""
+        """Zincir bozulduğunda algılandığını test eder"""
         bad_records = self.mock_records.copy()
-        # Ortadaki kaydı bozuyoruz
         bad_records[1] = {"id": 2, "file_hash": "def222", "prev_hash": "HACKED"}
         
         result = ChainValidator.validate_chain(bad_records)
@@ -52,29 +50,32 @@ class TestSystemIntegrity(unittest.TestCase):
     def test_merkle_root(self):
         """Merkle Root hesaplamasını test eder"""
         hashes = ["hash1", "hash2", "hash3", "hash4"]
-        root = MerkleTree.calculate_merkle_root(hashes)
+        
+        # --- DÜZELTME
+        # calculate_merkle_root YERİNE build_merkle_root KULLANIYORUZ
+        root = SecurityVaultManager.build_merkle_root(hashes)
+        
         self.assertTrue(len(root) > 0)
 
     def test_merkle_proof_integrity(self):
         """Merkle Proof'un veri manipülasyonunu yakaladığını test eder."""
         hashes = ["h1", "h2", "h3", "h4"]
-        root = MerkleTree.calculate_merkle_root(hashes)
         
-        # 'h2' için kanıt oluştur
-        proof = MerkleTree.get_merkle_proof(hashes, "h2")
+        # --- DÜZELTME
+        # calculate_merkle_root YERİNE build_merkle_root
+        root = SecurityVaultManager.build_merkle_root(hashes)
+        
+        # Kanıt oluşturma (get_merkle_proof SecurityVaultManager içinde)
+        proof = SecurityVaultManager.get_merkle_proof(hashes, "h2")
         
         # Doğru veriyle doğrulama
-        self.assertTrue(MerkleTree.verify_merkle_proof("h2", proof, root))
+        self.assertTrue(SecurityVaultManager.verify_merkle_proof("h2", proof, root))
         
-        # Manipüle edilmiş veriyle doğrulama (Hatalı olması beklenir)
-        self.assertFalse(MerkleTree.verify_merkle_proof("h2_manipulated", proof, root))
+        # Manipüle edilmiş veriyle doğrulama
+        self.assertFalse(SecurityVaultManager.verify_merkle_proof("h2_manipulated", proof, root))
 
-    # --- YENİ EKLENEN TEST ---
     def test_digital_signature(self):
-        """
-        CryptoModule/verify_util.py içindeki imza doğrulama fonksiyonunu test eder.
-        Raporla tam uyum için gereklidir.
-        """
+        """CryptoModule/verify_util.py içindeki imza doğrulama fonksiyonunu test eder."""
         message = "Test Mesajı"
         
         # 1. Mesajı private key ile imzala
@@ -87,18 +88,18 @@ class TestSystemIntegrity(unittest.TestCase):
             hashes.SHA256()
         )
         
-        # 2. İmzayı Base64 string formatına çevir (Backend simülasyonu)
+        # 2. İmzayı Base64 string formatına çevir
         signature_b64 = base64.b64encode(signature).decode('utf-8')
         
-        # Durum A: Doğru İmza -> True dönmeli
+        # Durum A: Doğru İmza
         valid = verify_signature(self.public_key_pem, message, signature_b64)
         self.assertTrue(valid, "Geçerli imza doğrulanmalıydı.")
         
-        # Durum B: Değiştirilmiş Mesaj -> False dönmeli
+        # Durum B: Değiştirilmiş Mesaj
         invalid_msg = verify_signature(self.public_key_pem, "Hacked Mesaj", signature_b64)
         self.assertFalse(invalid_msg, "Mesaj değiştiğinde imza geçersiz olmalıydı.")
         
-        # Durum C: Sahte İmza -> False dönmeli
+        # Durum C: Sahte İmza
         fake_sig_b64 = base64.b64encode(b'fake_signature_bytes').decode('utf-8')
         invalid_sig = verify_signature(self.public_key_pem, message, fake_sig_b64)
         self.assertFalse(invalid_sig, "Sahte imza kabul edilmemeliydi.")

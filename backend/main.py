@@ -1,3 +1,4 @@
+from datetime import timezone
 from fastapi import FastAPI, HTTPException
 from backend.database import init_db
 from backend.database import get_records, verify_chain
@@ -37,7 +38,7 @@ def register_record(payload: RegisterRequest):
     prev_hash = last_record["file_hash"] if last_record else "GENESIS"
 
     # Timestamp TEK KAYNAK: backend
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()
 
     # Canonical message (tek format)
     message = create_canonical_message(
@@ -48,18 +49,23 @@ def register_record(payload: RegisterRequest):
     )
 
     # Signature zorunlu
-    if not payload.user_key or not payload.signature:
+    if not payload.public_key or not payload.signature:
         raise HTTPException(
             status_code=400,
-            detail="user_key ve signature zorunludur."
+            detail="public_key ve signature zorunludur."
         )
-
+    
     # Signature doğrulama
-    if not verify_signature(payload.user_key, message, payload.signature):
+    if not verify_signature(
+        payload.public_key,
+        message,
+        payload.signature
+    ):
         raise HTTPException(
             status_code=401,
             detail="Geçersiz signature."
         )
+    
 
     # Gerçek Merkle root
     vault = SecurityVaultManager()
@@ -72,7 +78,7 @@ def register_record(payload: RegisterRequest):
         file_name=payload.file_name,
         file_hash=payload.file_hash,
         prev_hash=prev_hash,
-        user_key=payload.user_key,
+        user_key=payload.public_key,  # <--- KRİTİK DÜZELTME BURADA YAPILDI
         merkle_root=merkle_root,
         timestamp=timestamp
     )

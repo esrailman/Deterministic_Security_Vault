@@ -26,6 +26,17 @@ Bash
 python -m uvicorn backend.main:app --reload
 The server will start at: http://127.0.0.1:8000
 
+## Frontend (UI)
+The frontend is a standalone Static Web Application. No installation required.
+Simply open the following file in your browser:
+
+`frontend/index.html`
+
+This will launch the **Security Dashboard**, where you can access:
+*   **Vault (Register)**: `upload.html`
+*   **Verify**: `verify.html` (Check file integrity)
+*   **Audit Chain**: `audit.html` (View immutable ledger)
+
 ####################### API Documentation #######################
 For detailed interactive documentation (Swagger UI), visit: http://127.0.0.1:8000/docs
 
@@ -74,8 +85,7 @@ Deterministic_Security_Vault/
 │   ├── schemas.py         # Pydantic Data Models
 │   └── logger.py          # Audit Logging
 ├── frontend/              # Client-side Application (UI)
-│   ├── src/               
-│   └── public/
+│   ├── assets/            # CSS & JS (Cyber Theme)
 ├── CryptoModule/
 │   ├── security_engine.py # Merkle Tree, Proof & Chain Engine
 │   ├── verify_util.py     # RSA Signature Verification & Replay Protection

@@ -4,10 +4,11 @@ from backend.database import get_records, verify_chain
 from backend.logger import logger
 from backend.schemas import AuditResponse, RecordOut, RegisterRequest
 from backend.database import insert_record, get_last_record
+from datetime import datetime
+from fastapi import HTTPException
+from CryptoModule.verify_util import (create_canonical_message,verify_signature,)
+from CryptoModule.security_engine import SecurityVaultManager
 
-# --- EKLENEN IMPORTLAR ---
-from CryptoModule.merkle_util import MerkleTree  # MerkleTree sınıfını kullanabilmek için şart!
-from CryptoModule.verify_util import verify_signature  # İmza doğrulaması için
 
 app = FastAPI(
     title="Deterministic Security Vault API",
@@ -30,50 +31,55 @@ init_db()
     description="Calculates the hash of the uploaded file, verifies the digital signature, updates the Merkle Tree, and stores the record immutably."
 )
 def register_record(payload: RegisterRequest):
-    # 1. İmza Doğrulama
-    if payload.signature and payload.user_key:
-        is_valid = verify_signature(payload.user_key, payload.file_hash, payload.signature)
-        if not is_valid:
-            logger.warning(f"Invalid signature attempt for file: {payload.file_name}")
-            raise HTTPException(status_code=400, detail="Invalid Digital Signature! Integrity check failed.")
 
-    # 2. Geçmiş kayıtları getir ve Merkle Root hesapla (DÜZELTME BURADA)
-    all_records = get_records()  # Veritabanındaki tüm kayıtları çek
-    
-    # Mevcut hash listesini oluştur
-    current_hashes = [r["file_hash"] for r in all_records]
-    current_hashes.append(payload.file_hash)  # Yeni hash'i ekle
-    
-    # Tüm geçmiş + yeni kayıt ile Root hesapla
-    calculated_root = MerkleTree.calculate_merkle_root(current_hashes)
-
-    # Önceki hash (Zincir için)
-    last_record = all_records[-1] if all_records else None
+    # Önceki hash (hash-chain)
+    last_record = get_last_record()
     prev_hash = last_record["file_hash"] if last_record else "GENESIS"
 
-    # Kayıt ekle
+    # Timestamp TEK KAYNAK: backend
+    timestamp = datetime.utcnow().isoformat()
+
+    # Canonical message (tek format)
+    message = create_canonical_message(
+        file_name=payload.file_name,
+        file_hash=payload.file_hash,
+        prev_hash=prev_hash,
+        timestamp=timestamp
+    )
+
+    # Signature zorunlu
+    if not payload.user_key or not payload.signature:
+        raise HTTPException(
+            status_code=400,
+            detail="user_key ve signature zorunludur."
+        )
+
+    # Signature doğrulama
+    if not verify_signature(payload.user_key, message, payload.signature):
+        raise HTTPException(
+            status_code=401,
+            detail="Geçersiz signature."
+        )
+
+    # Gerçek Merkle root
+    vault = SecurityVaultManager()
+    merkle_root = vault.build_merkle_root(
+        [payload.file_hash, prev_hash]
+    )
+
+    # DB insert (timestamp ile)
     insert_record(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
         prev_hash=prev_hash,
-        user_key=payload.user_key or "unknown",
-        merkle_root=calculated_root 
+        user_key=payload.user_key,
+        merkle_root=merkle_root,
+        timestamp=timestamp
     )
 
     logger.info(f"New record registered: {payload.file_name}")
 
-    # Son eklenen kaydı dönmek için tekrar sorgula
-    r = get_last_record()
-    return RecordOut(
-        id=r["id"],
-        file_name=r["file_name"],
-        file_hash=r["file_hash"],
-        prev_hash=r["prev_hash"],
-        timestamp=r["timestamp"]
-    )
-
-    logger.info(f"New record registered: {payload.file_name}")
-
+    # Response
     r = get_last_record()
     return RecordOut(
         id=r["id"],

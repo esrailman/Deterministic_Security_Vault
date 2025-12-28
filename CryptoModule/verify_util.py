@@ -4,7 +4,7 @@ from datetime import datetime
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.exceptions import InvalidSignature
-
+from datetime import timezone
 def create_canonical_message(
     file_name: str,
     file_hash: str,
@@ -46,24 +46,13 @@ def verify_signature(public_key_pem: str, message: str, signature_b64: str) -> b
         # Return False if signature is invalid, key is corrupt, or base64 error
         return False
 
-def check_replay_protection(
-    timestamp: str,
-    window_minutes: int = 5
-) -> bool:
-    """
-    Replay attack prevention: Rejects if message timestamp
-    is too old compared to server time (default 5 min).
-    """
+def check_replay_protection(timestamp: str, window_minutes: int = 5) -> bool:
     try:
-        # Convert ISO format string to datetime object
         msg_time = datetime.fromisoformat(timestamp)
-        
-        # Calculate difference with current time (UTC)
-        # Note: datetime.utcnow() is for older versions, timezone.utc is recommended in modern python
-        # but preserving your code for consistency.
-        diff_minutes = (datetime.utcnow() - msg_time).total_seconds() / 60.0
-        
-        # Valid if time difference is between 0 and window (5 min)
+
+        now = datetime.now(timezone.utc)
+        diff_minutes = (now - msg_time).total_seconds() / 60.0
+
         return 0 <= diff_minutes < window_minutes
     except Exception:
         return False

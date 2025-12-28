@@ -21,6 +21,7 @@ class RegisterRequest(BaseModel):
     file_hash: str
     public_key: str        # PEM formatted public key
     signature: str         # Base64 encoded RSA signature
+    timestamp: str         # ISO8601 timestamp (from /register/prepare)
 
 
 class VerifyRequest(BaseModel):
@@ -31,3 +32,7 @@ class VerifyResponse(BaseModel):
     verified: bool
     message: str
     record: Optional[RecordOut] = None
+
+class PrepareRegisterRequest(BaseModel):
+    file_name: str
+    file_hash: str

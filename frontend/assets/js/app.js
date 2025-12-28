@@ -4,10 +4,16 @@ const API_BASE_URL = 'http://127.0.0.1:8000';
 
 // Global state for selected file
 let selectedFile = null;
+let userPrivateKey = null;
+let userPublicKeyPem = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () =>  {
     logToConsole("System Initialized...", "system");
 
+    //  RSA key üret (Browser Keystore)
+    await generateKeyPair();
+
+    
     // --- 1. Matrix Background Init ---
     initMatrixRain();
 
@@ -103,54 +109,71 @@ function setupUploadPage(dropZone) {
 
 // Actual Logic moved to separate function
 async function processRegistration(dropZone, file) {
-    // Visual Feedback
     updateDropZoneStatus(dropZone, 'processing', 'Calculating Hash & Signing...');
 
     try {
-        // 1. Calculate Hash
+        // 1️⃣ Calculate Hash
         const fileHash = await calculateFileHash(file);
         logToConsole(`Hash Calculated: ${fileHash.substring(0, 10)}...`, "success");
 
-        // 2. Generate Mock User Key & Signature (In real app, this comes from a Wallet)
-        const mockPublicKey = "PREMIUM_USER_KEY_XYZ_123";
-        const mockSignature = btoa("valid_rsa_signature_mock_" + Date.now());
-        logToConsole("Generating RSA-2048 Signature...", "system");
-
-        // 3. Send to Backend
-        const payload = {
-            file_name: file.name,
-            file_hash: fileHash,
-            public_key: mockPublicKey,
-            signature: mockSignature
-        };
-
-        logToConsole("Sending encrypted payload to Vault...", "system");
-        const response = await fetch(`${API_BASE_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+        // 2️⃣ PREPARE — canonical message al
+        const prepResp = await fetch(`${API_BASE_URL}/register/prepare`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                file_name: file.name,
+                file_hash: fileHash
+            })
         });
 
-        if (response.ok) {
-            const result = await response.json();
-            updateDropZoneStatus(dropZone, 'success', `Registered! ID: #${result.id}`);
-            logToConsole(`SUCCESS: Block #${result.id} mined.`, "success");
+        if (!prepResp.ok) {
+            throw new Error("Prepare step failed");
+        }
 
-            // Reset selection after success (optional)
-            selectedFile = null;
-            const btn = document.getElementById('btn-register-manual');
-            if (btn) {
-                btn.innerHTML = `<i class="fa-solid fa-check"></i> Registered Successfully`;
-                setTimeout(() => {
-                    btn.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Sign & Register Record`;
-                    btn.style.opacity = '0.5';
-                    btn.style.cursor = 'not-allowed';
-                }, 4000);
-            }
+        const prep = await prepResp.json();
 
-        } else {
+        // 3️⃣ SIGN — Browser Keystore (REAL RSA)
+        logToConsole("Signing canonical message with RSA-PSS...", "system");
+        if (!userPrivateKey) {
+            throw new Error("Cryptographic key not initialized");
+        }
+        const signature = await signCanonicalMessage(
+            prep.canonical_message
+        );
+
+        // 4️⃣ REGISTER
+        const response = await fetch(`${API_BASE_URL}/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                file_name: file.name,
+                file_hash: fileHash,
+                public_key: userPublicKeyPem,
+                signature: signature,
+                timestamp: prep.timestamp
+            })
+        });
+
+        if (!response.ok) {
             const err = await response.json();
             throw new Error(err.detail || "Registration failed");
+        }
+
+        const result = await response.json();
+
+        updateDropZoneStatus(dropZone, 'success', `Registered! ID: #${result.id}`);
+        logToConsole(`SUCCESS: Block #${result.id} registered with valid RSA signature.`, "success");
+
+        // UI reset
+        selectedFile = null;
+        const btn = document.getElementById('btn-register-manual');
+        if (btn) {
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> Registered Successfully`;
+            setTimeout(() => {
+                btn.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Sign & Register Record`;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            }, 4000);
         }
 
     } catch (error) {
@@ -159,6 +182,7 @@ async function processRegistration(dropZone, file) {
         logToConsole(`ERROR: ${error.message}`, "error");
     }
 }
+
 
 // ==========================================
 // VERIFY PAGE LOGIC
@@ -311,6 +335,57 @@ function setupDragAndDrop(element, onFileDrop) {
         }
         input.click();
     });
+}
+//generate RSA Key Pair in Browser Keystore
+async function generateKeyPair() {
+    const keyPair = await crypto.subtle.generateKey(
+        {
+            name: "RSA-PSS",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: "SHA-256"
+        },
+        false, // private key EXPORT EDİLEMEZ
+        ["sign", "verify"]
+    );
+
+    userPrivateKey = keyPair.privateKey;
+
+    // Public key export (SPKI)
+    const spki = await crypto.subtle.exportKey(
+        "spki",
+        keyPair.publicKey
+    );
+
+    userPublicKeyPem = spkiToPem(spki);
+
+    console.log("RSA key pair generated in browser keystore");
+}
+
+function spkiToPem(spkiBuffer) {
+    const b64 = btoa(
+        String.fromCharCode(...new Uint8Array(spkiBuffer))
+    );
+    const lines = b64.match(/.{1,64}/g).join("\n");
+    return `-----BEGIN PUBLIC KEY-----\n${lines}\n-----END PUBLIC KEY-----`;
+}
+
+async function signCanonicalMessage(message) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(message);
+
+    const signature = await crypto.subtle.sign(
+        {
+            name: "RSA-PSS",
+            saltLength: 32
+        },
+        userPrivateKey,
+        data
+    );
+
+    return btoa(
+        String.fromCharCode(...new Uint8Array(signature))
+    );
 }
 
 function updateDropZoneStatus(dropZone, status, message) {

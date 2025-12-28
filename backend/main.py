@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from datetime import timezone
+from fastapi import FastAPI, HTTPException
 from backend.database import init_db
 from backend.database import get_records, verify_chain
 from backend.logger import logger
@@ -10,12 +11,26 @@ from CryptoModule.verify_util import (create_canonical_message,verify_signature,
 from CryptoModule.security_engine import SecurityVaultManager
 
 
-app = FastAPI()
+app = FastAPI(
+    title="Deterministic Security Vault API",
+    description="Deterministic security API providing file integrity via Merkle Tree and Hash Chain.",
+    version="1.0.0",
+    openapi_tags=[
+        {"name": "Register", "description": "File registration and hashing operations"},
+        {"name": "Audit", "description": "Chain validation and audit logs"},
+    ]
+)
 
 # Veritabanı başlatma
 init_db()
 
-@app.post("/register", response_model=RecordOut)
+@app.post(
+    "/register", 
+    response_model=RecordOut,
+    tags=["Register"],
+    summary="Register a New File",
+    description="Calculates the hash of the uploaded file, verifies the digital signature, updates the Merkle Tree, and stores the record immutably."
+)
 def register_record(payload: RegisterRequest):
 
     # Önceki hash (hash-chain)
@@ -23,7 +38,7 @@ def register_record(payload: RegisterRequest):
     prev_hash = last_record["file_hash"] if last_record else "GENESIS"
 
     # Timestamp TEK KAYNAK: backend
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()
 
     # Canonical message (tek format)
     message = create_canonical_message(
@@ -34,18 +49,23 @@ def register_record(payload: RegisterRequest):
     )
 
     # Signature zorunlu
-    if not payload.user_key or not payload.signature:
+    if not payload.public_key or not payload.signature:
         raise HTTPException(
             status_code=400,
-            detail="user_key ve signature zorunludur."
+            detail="public_key ve signature zorunludur."
         )
-
+    
     # Signature doğrulama
-    if not verify_signature(payload.user_key, message, payload.signature):
+    if not verify_signature(
+        payload.public_key,
+        message,
+        payload.signature
+    ):
         raise HTTPException(
             status_code=401,
             detail="Geçersiz signature."
         )
+    
 
     # Gerçek Merkle root
     vault = SecurityVaultManager()
@@ -58,7 +78,7 @@ def register_record(payload: RegisterRequest):
         file_name=payload.file_name,
         file_hash=payload.file_hash,
         prev_hash=prev_hash,
-        user_key=payload.user_key,
+        user_key=payload.public_key,  # <--- KRİTİK DÜZELTME BURADA YAPILDI
         merkle_root=merkle_root,
         timestamp=timestamp
     )
@@ -83,7 +103,13 @@ def ping():
 def health():
     return {"status": "ok"}
 
-@app.get("/audit", response_model=AuditResponse)
+@app.get(
+    "/audit", 
+    response_model=AuditResponse, 
+    tags=["Audit"],
+    summary="Validate Chain Integrity",
+    description="Performs a complete audit of the hash chain to detect any tampering or broken links in the database."
+)
 def audit():
     records = get_records()
     chain_valid, broken = verify_chain()

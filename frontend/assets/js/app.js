@@ -38,7 +38,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Audit Page Logic ---
     const auditTableBody = document.getElementById('auditTableBody');
-    if (auditTableBody) loadAuditChain();
+    if (auditTableBody) {
+        loadAuditChain();
+        const btnRefresh = document.getElementById('btn-refresh-chain');
+        if (btnRefresh) {
+            btnRefresh.addEventListener('click', () => {
+                logToConsole("Refreshing Chain...", "system");
+                loadAuditChain();
+            });
+        }
+    }
+
+    // --- Dashboard Logic ---
+    const btnViewChain = document.getElementById('btn-view-full-chain');
+    if (btnViewChain) {
+        btnViewChain.addEventListener('click', () => {
+            window.location.href = 'audit.html';
+        });
+    }
 });
 
 // ==========================================
@@ -280,10 +297,12 @@ function setupDragAndDrop(element, onFileDrop) {
         }
     });
 
-    // Manual Click
+    // Generic Click Handler for the whole zone (including the button inside it)
     element.addEventListener('click', (e) => {
-        // Prevent trigger if clicking on button which has its own listener
-        if (e.target.tagName === 'BUTTON') return;
+        // Only ignore the "Sign & Register" button (which is OUTSIDE the dropzone usually, but safeguard)
+        // And ignore specific buttons if they have logic.
+        // But for "Browse Files" button inside dropzone, we WANT to trigger.
+        if (e.target.id === 'btn-register-manual') return;
 
         const input = document.createElement('input');
         input.type = 'file';

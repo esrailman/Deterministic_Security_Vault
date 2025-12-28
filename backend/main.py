@@ -30,7 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Veritabanı başlatma
+# Database initialization
 init_db()
 
 @app.post(
@@ -42,7 +42,7 @@ init_db()
 )
 def register_record(payload: RegisterRequest):
 
-    # Önceki hash (hash-chain)
+    # Previous hash (hash-chain)
     last_record = get_last_record()
     prev_hash = last_record["file_hash"] if last_record else "GENESIS"
 
@@ -64,9 +64,9 @@ def register_record(payload: RegisterRequest):
             detail="public_key ve signature zorunludur."
         )
     
-    # Signature doğrulama
-    # NOT: Frontend (app.js) demo modunda gerçek bir RSA anahtarı üretemediği için
-    # ve backend-side timestamp'i imzalayamadığı için, demo anahtarına izin veriyoruz.
+    # Signature verification
+    # NOTE: Since the Frontend (app.js) is in demo mode and cannot generate a real RSA key
+    # or sign the backend-side timestamp, we allow the demo key.
     if payload.public_key.startswith("PREMIUM_USER"):
         logger.warning(f"DEV SIGNATURE BYPASS for user: {payload.public_key}")
     elif not verify_signature(
@@ -76,11 +76,11 @@ def register_record(payload: RegisterRequest):
     ):
         raise HTTPException(
             status_code=401,
-            detail="Geçersiz signature."
+            detail="Invalid signature."
         )
     
 
-    # Gerçek Merkle root
+    # Real Merkle root
     vault = SecurityVaultManager()
     merkle_root = vault.build_merkle_root(
         [payload.file_hash, prev_hash]
@@ -91,7 +91,7 @@ def register_record(payload: RegisterRequest):
         file_name=payload.file_name,
         file_hash=payload.file_hash,
         prev_hash=prev_hash,
-        user_key=payload.public_key,  # <--- KRİTİK DÜZELTME BURADA YAPILDI
+        user_key=payload.public_key,  # <--- CRITICAL FIX APPLIED HERE
         merkle_root=merkle_root,
         timestamp=timestamp
     )

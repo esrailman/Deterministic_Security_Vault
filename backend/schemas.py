@@ -19,7 +19,7 @@ class AuditResponse(BaseModel):
 class RegisterRequest(BaseModel):
     file_name: str
     file_hash: str
-    public_key: str        # PEM formatında public key
+    public_key: str        # PEM formatted public key
     signature: str         # Base64 encoded RSA signature
 
 

@@ -1,19 +1,19 @@
 import sqlite3
 from pathlib import Path
 
-# Veritabanı dosya yolu (backend klasörü içinde vault.db oluşacak)
+# Database file path (vault.db will be created inside the backend folder)
 DB_PATH = Path(__file__).resolve().parent / "vault.db"
 
 
 def get_connection():
-    """SQLite veritabanına bağlanır ve connection nesnesi döner."""
+    """Connects to the SQLite database and returns the connection object."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
-    """records tablosu yoksa oluşturur."""
+    """Creates the records table if it does not exist."""
     conn = get_connection()
     cur = conn.cursor()
 
@@ -43,7 +43,7 @@ def insert_record(
     merkle_root: str,
     timestamp: str
 ):
-    """Yeni bir kayıt ekler (timestamp DIŞARIDAN gelir)."""
+    """Inserts a new record (timestamp comes from OUTSIDE)."""
     conn = get_connection()
     cur = conn.cursor()
 
@@ -60,7 +60,7 @@ def insert_record(
 
 
 def get_last_record():
-    """En son eklenen kaydı döndürür."""
+    """Returns the last added record."""
     conn = get_connection()
     cur = conn.cursor()
 
@@ -72,7 +72,7 @@ def get_last_record():
 
 
 def get_records():
-    """Tüm kayıtları döndürür."""
+    """Returns all records."""
     conn = get_connection()
     cur = conn.cursor()
 
@@ -85,7 +85,7 @@ def get_records():
 
 def verify_chain():
     """
-    Hash chain tutarlılığını kontrol eder.
+    Checks the consistency of the hash chain.
     """
     records = get_records()
 
@@ -106,7 +106,7 @@ def verify_chain():
 
 def get_record_by_hash(file_hash: str):
     """
-    Belirtilen file_hash değerine sahip kaydı döndürür.
+    Returns the record with the specified file_hash.
     """
     conn = get_connection()
     cur = conn.cursor()

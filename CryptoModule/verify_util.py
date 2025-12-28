@@ -12,26 +12,26 @@ def create_canonical_message(
     timestamp: str
 ) -> str:
     """
-    Sistemde imzalanacak TEK canonical mesaj formatı.
+    The SINGLE canonical message format to be signed in the system.
     Format: file_name|file_hash|prev_hash|timestamp
     """
     return f"{file_name}|{file_hash}|{prev_hash}|{timestamp}"
 
 def verify_signature(public_key_pem: str, message: str, signature_b64: str) -> bool:
     """
-    RSA-SHA256 (PSS Padding) ile imza doğrular.
-    test_integration.py ile ve Sprint 4 standartlarıyla tam uyumludur.
+    Verifies signature using RSA-SHA256 (PSS Padding).
+    Fully compatible with test_integration.py and Sprint 4 standards.
     """
     try:
-        # 1. Public Key'i yükle
+        # 1. Load Public Key
         public_key = serialization.load_pem_public_key(
             public_key_pem.encode('utf-8')
         )
         
-        # 2. İmzayı Base64'ten çöz
+        # 2. Decode Signature from Base64
         signature_bytes = base64.b64decode(signature_b64)
         
-        # 3. Doğrulama yap (RSA-PSS)
+        # 3. Perform Verification (RSA-PSS)
         public_key.verify(
             signature_bytes,
             message.encode('utf-8'),
@@ -41,9 +41,9 @@ def verify_signature(public_key_pem: str, message: str, signature_b64: str) -> b
             ),
             hashes.SHA256()
         )
-        return True # Hata fırlatmazsa imza geçerlidir
+        return True # Signature is valid if no error is raised
     except (InvalidSignature, ValueError, Exception):
-        # İmza geçersizse, key bozuksa veya base64 hatası varsa False dön
+        # Return False if signature is invalid, key is corrupt, or base64 error
         return False
 
 def check_replay_protection(
@@ -51,19 +51,19 @@ def check_replay_protection(
     window_minutes: int = 5
 ) -> bool:
     """
-    Replay attack önleme: Mesajın zaman damgası (timestamp)
-    sunucu zamanından çok eskiyse (varsayılan 5 dk) reddeder.
+    Replay attack prevention: Rejects if message timestamp
+    is too old compared to server time (default 5 min).
     """
     try:
-        # ISO formatındaki string'i datetime objesine çevir
+        # Convert ISO format string to datetime object
         msg_time = datetime.fromisoformat(timestamp)
         
-        # Şu anki zaman ile farkı al (UTC)
-        # Not: datetime.utcnow() eski sürümler içindir, modern python'da timezone.utc önerilir
-        # ama proje tutarlılığı için senin kodunu koruyoruz.
+        # Calculate difference with current time (UTC)
+        # Note: datetime.utcnow() is for older versions, timezone.utc is recommended in modern python
+        # but preserving your code for consistency.
         diff_minutes = (datetime.utcnow() - msg_time).total_seconds() / 60.0
         
-        # Zaman farkı 0 ile pencere aralığı (5 dk) içindeyse geçerlidir
+        # Valid if time difference is between 0 and window (5 min)
         return 0 <= diff_minutes < window_minutes
     except Exception:
         return False

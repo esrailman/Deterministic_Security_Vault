@@ -9,7 +9,7 @@ class SecurityVaultManager:
     def __init__(self):
         self.chain = []
 
-    # --- MEVCUT FONKSİYONLAR (DEĞİŞTİRİLMEDİ) ---
+    # --- EXISTING FUNCTIONS (UNCHANGED) ---
     @staticmethod
     def build_merkle_root(hash_list: List[str]) -> str:
         if not hash_list: return ""
@@ -35,7 +35,7 @@ class SecurityVaultManager:
     @staticmethod
     def get_merkle_proof(hashes: List[str], target_hash: str) -> List[Dict]:
         """
-        Belirtilen bir hash değeri için Merkle Proof (kanıt yolu) oluşturur.
+        Generates a Merkle Proof (proof path) for a specified hash value.
         """
         if target_hash not in hashes:
             return []
@@ -54,14 +54,14 @@ class SecurityVaultManager:
                 left = temp_hashes[i]
                 right = temp_hashes[i+1] if i+1 < len(temp_hashes) else left
                 
-                # Hedef bu ikiliden biri mi?
+                # Is the target one of these two?
                 if i == idx or i == idx - 1:
-                    if i == idx: # Hedef Solda -> Kardeş Sağda
+                    if i == idx: # Target Left -> Sibling Right
                         proof.append({"position": "right", "hash": right})
-                    else:        # Hedef Sağda -> Kardeş Solda
+                    else:        # Target Right -> Sibling Left
                         proof.append({"position": "left", "hash": left})
                 
-                # Birleştirme işlemi (Hasher sınıfını kullanarak tutarlılık sağlar)
+                # Concatenation (Ensures consistency using Hasher class)
                 combined = left + right
                 new_hash = Hasher.get_hash(combined)
                 new_level.append(new_hash)
@@ -74,7 +74,7 @@ class SecurityVaultManager:
     @staticmethod
     def verify_merkle_proof(target_hash: str, proof: List[Dict], root: str) -> bool:
         """
-        Kanıt yolunu takip ederek Root'a ulaşıp ulaşmadığını doğrular.
+        Verifies if the Root can be reached by following the proof path.
         """
         current_hash = target_hash
         

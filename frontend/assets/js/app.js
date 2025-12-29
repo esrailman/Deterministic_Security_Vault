@@ -7,13 +7,13 @@ let selectedFile = null;
 let userPrivateKey = null;
 let userPublicKeyPem = null;
 
-document.addEventListener('DOMContentLoaded', async () =>  {
+document.addEventListener('DOMContentLoaded', async () => {
     logToConsole("System Initialized...", "system");
 
     //  RSA key üret (Browser Keystore)
     await generateKeyPair();
 
-    
+
     // --- 1. Matrix Background Init ---
     initMatrixRain();
 
@@ -62,7 +62,67 @@ document.addEventListener('DOMContentLoaded', async () =>  {
             window.location.href = 'audit.html';
         });
     }
+
+    // Load Stats if on Dashboard
+    const totalRecordsDisplay = document.getElementById('total-records-display');
+    if (totalRecordsDisplay) {
+        loadDashboardStats();
+    }
 });
+
+// ==========================================
+// DASHBOARD STATS
+// ==========================================
+async function loadDashboardStats() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/audit`);
+        const data = await response.json();
+
+        // 1. Total Count
+        const countDiv = document.getElementById('total-records-display');
+        if (countDiv) {
+            countDiv.innerText = data.records.length;
+        }
+
+        // 2. Today's Count
+        const todayDiv = document.getElementById('today-stats-display');
+        if (todayDiv) {
+            // Get today's date in YYYY-MM-DD local format
+            const today = new Date().toLocaleDateString('en-CA');
+
+            const todayRecords = data.records.filter(r => {
+                const rDate = new Date(r.timestamp).toLocaleDateString('en-CA');
+                return rDate === today;
+            });
+
+            const count = todayRecords.length;
+            todayDiv.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> +${count} today`;
+        }
+
+        // 3. Integrity Check (System Health)
+        const integrityDiv = document.getElementById('integrity-score-display');
+        const lastAuditDiv = document.getElementById('last-audit-time-display');
+
+        if (integrityDiv) {
+            if (data.chain_valid) {
+                integrityDiv.innerText = "100%";
+                integrityDiv.style.color = "var(--success)";
+            } else {
+                integrityDiv.innerHTML = `<span style="font-size:2rem">FAIL</span>`;
+                integrityDiv.style.color = "var(--error)";
+            }
+        }
+
+        if (lastAuditDiv) {
+            // Since we just called /audit, the check happened "Just now"
+            const time = new Date().toLocaleTimeString();
+            lastAuditDiv.innerText = `Last audit: ${time}`;
+        }
+
+    } catch (error) {
+        console.error("Failed to load stats", error);
+    }
+}
 
 // ==========================================
 // SHA-256 Hashing (Browser Native - SubtleCrypto)
@@ -234,14 +294,15 @@ function setupVerifyPage(dropZone) {
                             <div>
                                 <h4 style="color: var(--error); margin-bottom: 0.25rem;">Verification Failed</h4>
                                 <p style="font-size: 0.9rem; color: var(--text-muted);">
-                                    This file hash was NOT found in the immutable ledger.
+                                    This file hash was NOT found in the immutable ledger.<br>
+                                    <span style="color: rgba(255,100,100,0.8); font-size: 0.8rem;">(The file may have been modified or tampered with)</span>
                                 </p>
                             </div>
                         </div>
                      `;
                     resultArea.style.borderColor = 'rgba(255, 0, 85, 0.3)';
                     resultArea.style.background = 'rgba(255, 0, 85, 0.05)';
-                    updateDropZoneStatus(dropZone, 'error', 'Not Found');
+                    updateDropZoneStatus(dropZone, 'error', 'Not Found (Modified?)');
                     logToConsole("ALERT: No match in ledger.", "error");
                 }
             } else {
@@ -267,27 +328,26 @@ function setupVerifyPage(dropZone) {
 // ==========================================
 // AUDIT PAGE LOGIC
 // ==========================================
+// ==========================================
+// AUDIT PAGE LOGIC
+// ==========================================
+let globalAuditRecords = [];
+let currentAuditPage = 1;
+const AUDIT_ITEMS_PER_PAGE = 10;
+
 async function loadAuditChain() {
     logToConsole("Syncing with Immutable Ledger...", "system");
     try {
         const response = await fetch(`${API_BASE_URL}/audit`);
         const data = await response.json();
 
-        const tbody = document.getElementById('auditTableBody');
-        tbody.innerHTML = '';
+        // 1. Store Data Reverse Chronological (Newest First)
+        globalAuditRecords = data.records.sort((a, b) => b.id - a.id);
 
-        data.records.forEach(record => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td style="color: var(--primary-cyan);">#${record.id}</td>
-                <td>${new Date(record.timestamp).toLocaleString()}</td>
-                <td><span class="status-badge status-valid"><i class="fa-solid fa-cube"></i> Block</span></td>
-                <td>${record.file_name}</td>
-                <td class="hash-cell" title="${record.file_hash}">${record.file_hash.substring(0, 10)}...</td>
-                <td><span class="status-badge status-success">Valid</span></td>
-            `;
-            tbody.appendChild(row);
-        });
+        // 2. Render First Page
+        currentAuditPage = 1;
+        renderAuditTable();
+
         logToConsole(`Sync Complete. ${data.records.length} blocks loaded.`, "success");
 
     } catch (error) {
@@ -296,7 +356,61 @@ async function loadAuditChain() {
     }
 }
 
+function renderAuditTable() {
+    const tbody = document.getElementById('auditTableBody');
+    if (!tbody) return;
 
+    tbody.innerHTML = '';
+
+    // Pagination Calculation
+    const start = (currentAuditPage - 1) * AUDIT_ITEMS_PER_PAGE;
+    const end = start + AUDIT_ITEMS_PER_PAGE;
+    const pageRecords = globalAuditRecords.slice(start, end);
+    const totalPages = Math.ceil(globalAuditRecords.length / AUDIT_ITEMS_PER_PAGE) || 1;
+
+    // Render Rows
+    pageRecords.forEach(record => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td style="color: var(--primary-cyan);">#${record.id}</td>
+            <td>${new Date(record.timestamp).toLocaleString()}</td>
+            <td><span class="status-badge status-valid"><i class="fa-solid fa-cube"></i> Block</span></td>
+            <td>${record.file_name}</td>
+            <td class="hash-cell" title="${record.file_hash}">${record.file_hash.substring(0, 10)}...</td>
+            <td><span class="status-badge status-success">Valid</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Update Pagination UI
+    const pageInfo = document.getElementById('page-info');
+    const btnPrev = document.getElementById('btn-audit-prev');
+    const btnNext = document.getElementById('btn-audit-next');
+
+    if (pageInfo) pageInfo.innerText = `Page ${currentAuditPage} of ${totalPages}`;
+
+    if (btnPrev) {
+        btnPrev.disabled = currentAuditPage === 1;
+        btnPrev.style.opacity = currentAuditPage === 1 ? '0.3' : '1';
+        btnPrev.onclick = () => {
+            if (currentAuditPage > 1) {
+                currentAuditPage--;
+                renderAuditTable();
+            }
+        };
+    }
+
+    if (btnNext) {
+        btnNext.disabled = currentAuditPage === totalPages;
+        btnNext.style.opacity = currentAuditPage === totalPages ? '0.3' : '1';
+        btnNext.onclick = () => {
+            if (currentAuditPage < totalPages) {
+                currentAuditPage++;
+                renderAuditTable();
+            }
+        };
+    }
+}
 // ==========================================
 // HELPERS (UI & EVENTS)
 // ==========================================

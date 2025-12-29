@@ -55,17 +55,19 @@
             <!-- Quick Stats -->
             <div class="glass-card col-3">
                 <h4 style="color: var(--text-muted); margin-bottom: 1rem;">Total Records</h4>
-                <div style="font-size: 2.5rem; font-weight: 700; color: #fff;">1,024</div>
-                <div style="color: var(--success); font-size: 0.8rem; margin-top: 0.5rem;">
-                    <i class="fa-solid fa-arrow-trend-up"></i> +12 today
+                <div id="total-records-display" style="font-size: 2.5rem; font-weight: 700; color: #fff;">...</div>
+                <div id="today-stats-display" style="color: var(--success); font-size: 0.8rem; margin-top: 0.5rem;">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Calculating...
                 </div>
             </div>
 
             <div class="glass-card col-3">
                 <h4 style="color: var(--text-muted); margin-bottom: 1rem;">Integrity Check</h4>
-                <div style="font-size: 2.5rem; font-weight: 700; color: var(--success);">100%</div>
-                <div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
-                    Last audit: 2m ago
+                <div id="integrity-score-display" style="font-size: 2.5rem; font-weight: 700; color: var(--success);">
+                    ...</div>
+                <div id="last-audit-time-display"
+                    style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
+                    Last audit: ...
                 </div>
             </div>
 

@@ -8,12 +8,13 @@ from cryptography.exceptions import InvalidSignature
 def create_canonical_message(
     file_name: str,
     file_hash: str,
-    # prev_hash: str,  <--- BU SİLİNDİ
     timestamp: str
 ) -> str:
     """
     The SINGLE canonical message format to be signed in the system.
     Format: file_name|file_hash|timestamp
+    
+    Removed prev_hash to simplify 2-phase commit and avoid race conditions.
     """
     return f"{file_name}|{file_hash}|{timestamp}"
 

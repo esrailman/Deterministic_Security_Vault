@@ -119,9 +119,151 @@ async function loadDashboardStats() {
             lastAuditDiv.innerText = `Last audit: ${time}`;
         }
 
+        // 4. Live Hash Chain
+        renderLiveHashChain(data.records);
+
+        // 5. Activity Chart (Canvas)
+        renderActivityChart(data.records);
+
     } catch (error) {
         console.error("Failed to load stats", error);
     }
+}
+
+function renderActivityChart(records) {
+    const canvas = document.getElementById('activityChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // 1. Prepare Data Buckets (Last 7 Days)
+    const days = 7;
+    const counts = new Array(days).fill(0);
+    const now = new Date();
+
+    // Create Date Labels for comparison
+    const labels = [];
+    for (let i = 0; i < days; i++) {
+        const d = new Date();
+        d.setDate(now.getDate() - (days - 1 - i));
+        labels.push(d.toLocaleDateString('en-CA'));
+    }
+
+    // Bucket records
+    records.forEach(r => {
+        const rDate = new Date(r.timestamp).toLocaleDateString('en-CA');
+        const idx = labels.indexOf(rDate);
+        if (idx !== -1) {
+            counts[idx]++;
+        }
+    });
+
+    // Normalize for scaling chart
+    const maxVal = Math.max(...counts, 1); // Avoid division by zero
+
+    // Draw Line
+    ctx.beginPath();
+    ctx.strokeStyle = '#00f0ff'; // Primary Cyan
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const stepX = width / (days - 1);
+
+    counts.forEach((count, i) => {
+        const x = i * stepX;
+        // Invert Y axis (canvas 0 is top)
+        // Normalize height: (count / max) * height
+        // Add 5px padding from top/bottom
+        const y = height - ((count / maxVal) * (height - 10)) - 5;
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+
+    ctx.stroke();
+
+    // Gradient Fill
+    ctx.lineTo(width, height);
+    ctx.lineTo(0, height);
+    ctx.closePath();
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(0, 240, 255, 0.2)');
+    gradient.addColorStop(1, 'rgba(0, 240, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw dots
+    counts.forEach((count, i) => {
+        const x = i * stepX;
+        const y = height - ((count / maxVal) * (height - 10)) - 5;
+
+        ctx.beginPath();
+        ctx.fillStyle = '#fff';
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+function renderLiveHashChain(records) {
+    const container = document.getElementById('live-chain-container');
+    if (!container) return; // Not on dashboard
+
+    container.innerHTML = '';
+
+    // Sort Newest First & Take Top 5
+    const latestBlocks = records.sort((a, b) => b.id - a.id).slice(0, 5);
+
+    if (latestBlocks.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-muted); padding:1rem;">No blocks mined yet. Register a file to start the chain.</div>`;
+        return;
+    }
+
+    latestBlocks.forEach((block, index) => {
+        // Block Card
+        const blockDiv = document.createElement('div');
+        blockDiv.style.cssText = `
+            min-width: 140px; 
+            height: 140px; 
+            background: rgba(0,0,0,0.3); 
+            border: 1px solid ${index === 0 ? 'var(--primary-cyan)' : 'rgba(255,255,255,0.1)'}; 
+            border-radius: 12px; 
+            padding: 1rem; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            position: relative;
+            transition: all 0.3s ease;
+        `;
+
+        // Hover effect via JS since inline styles are tricky for pseudo-classes
+        blockDiv.onmouseenter = () => { blockDiv.style.transform = 'translateY(-5px)'; blockDiv.style.borderColor = 'var(--primary-cyan)'; };
+        blockDiv.onmouseleave = () => { blockDiv.style.transform = 'translateY(0)'; blockDiv.style.borderColor = index === 0 ? 'var(--primary-cyan)' : 'rgba(255,255,255,0.1)'; };
+
+        blockDiv.innerHTML = `
+            <span style="font-size: 0.7rem; color: ${index === 0 ? 'var(--primary-cyan)' : 'var(--text-muted)'};">#${block.id}</span>
+            <div style="font-family: monospace; font-size: 0.6rem; color: var(--text-muted); word-break: break-all;" title="${block.file_hash}">
+                ${block.file_hash.substring(0, 10)}...
+            </div>
+            <i class="fa-solid fa-link" style="align-self: flex-end; color: ${index === 0 ? 'var(--success)' : 'var(--text-muted)'};"></i>
+        `;
+
+        container.appendChild(blockDiv);
+
+        // Arrow (only if not the last item in our slice)
+        if (index < latestBlocks.length - 1) {
+            const arrow = document.createElement('i');
+            arrow.className = "fa-solid fa-arrow-right";
+            arrow.style.cssText = "color: rgba(255,255,255,0.1); font-size: 0.8rem;";
+            container.appendChild(arrow);
+        }
+    });
 }
 
 // ==========================================

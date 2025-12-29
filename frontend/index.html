@@ -47,8 +47,8 @@
                         <p>Deterministic Verification: ON</p>
                     </div>
                 </div>
-                <div class="chart-container">
-                    <div class="chart-line"></div>
+                <div class="chart-container" style="height: 60px; display: flex; align-items: flex-end;">
+                    <canvas id="activityChart" width="200" height="60"></canvas>
                 </div>
             </div>
 
@@ -90,39 +90,11 @@
                         Chain</button>
                 </div>
 
-                <div style="display: flex; gap: 1rem; align-items: center; overflow-x: auto; padding-bottom: 1rem;">
-                    <!-- Block 1 -->
-                    <div
-                        style="min-width: 140px; height: 140px; background: rgba(0,0,0,0.3); border: 1px solid var(--primary-cyan); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
-                        <span style="font-size: 0.7rem; color: var(--primary-cyan);">#1024</span>
-                        <div
-                            style="font-family: monospace; font-size: 0.6rem; color: var(--text-muted); word-break: break-all;">
-                            0xa1b2...</div>
-                        <i class="fa-solid fa-link" style="align-self: flex-end; color: var(--success);"></i>
-                    </div>
-
-                    <i class="fa-solid fa-arrow-right" style="color: rgba(255,255,255,0.1);"></i>
-
-                    <!-- Block 2 -->
-                    <div
-                        style="min-width: 140px; height: 140px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between;">
-                        <span style="font-size: 0.7rem; color: var(--text-muted);">#1023</span>
-                        <div
-                            style="font-family: monospace; font-size: 0.6rem; color: var(--text-muted); word-break: break-all;">
-                            0xc3d4...</div>
-                        <i class="fa-solid fa-link" style="align-self: flex-end; color: var(--text-muted);"></i>
-                    </div>
-
-                    <i class="fa-solid fa-arrow-right" style="color: rgba(255,255,255,0.1);"></i>
-
-                    <!-- Block 3 -->
-                    <div
-                        style="min-width: 140px; height: 140px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between;">
-                        <span style="font-size: 0.7rem; color: var(--text-muted);">#1022</span>
-                        <div
-                            style="font-family: monospace; font-size: 0.6rem; color: var(--text-muted); word-break: break-all;">
-                            0xe5f6...</div>
-                        <i class="fa-solid fa-link" style="align-self: flex-end; color: var(--text-muted);"></i>
+                <div id="live-chain-container"
+                    style="display: flex; gap: 1rem; align-items: center; overflow-x: auto; padding-bottom: 1rem;">
+                    <!-- Live blocks will be injected here by app.js -->
+                    <div style="color: var(--text-muted); font-size: 0.9rem; padding: 1rem;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading blockchain...
                     </div>
                 </div>
             </div>

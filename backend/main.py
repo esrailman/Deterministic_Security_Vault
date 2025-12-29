@@ -1,16 +1,13 @@
-from datetime import timezone
+from datetime import timezone, datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import init_db
 from backend.database import get_records, verify_chain
 from backend.logger import logger
-from backend.schemas import AuditResponse, RecordOut, RegisterRequest, VerifyRequest, VerifyResponse
+from backend.schemas import AuditResponse, RecordOut, RegisterRequest, VerifyRequest, VerifyResponse, PrepareRegisterRequest
 from backend.database import insert_record, get_last_record, get_record_by_hash
-from datetime import datetime
-from fastapi import HTTPException
-from CryptoModule.verify_util import (create_canonical_message,verify_signature,)
+from CryptoModule.verify_util import create_canonical_message, verify_signature, check_replay_protection
 from CryptoModule.security_engine import SecurityVaultManager
-
 
 app = FastAPI(
     title="Deterministic Security Vault API",
@@ -33,6 +30,24 @@ app.add_middleware(
 # Database initialization
 init_db()
 
+@app.post("/register/prepare")
+def prepare_register(payload: PrepareRegisterRequest):
+    # Prepare aşamasında timestamp üretiyoruz ama prev_hash imzaya girmiyor artık.
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # DÜZELTME 1: prev_hash parametresi kaldırıldı
+    canonical_message = create_canonical_message(
+        file_name=payload.file_name,
+        file_hash=payload.file_hash,
+        timestamp=timestamp
+    )
+
+    return {
+        "canonical_message": canonical_message,
+        "timestamp": timestamp
+    }
+
+
 @app.post(
     "/register", 
     response_model=RecordOut,
@@ -42,34 +57,38 @@ init_db()
 )
 def register_record(payload: RegisterRequest):
 
-    # Previous hash (hash-chain)
-    last_record = get_last_record()
-    prev_hash = last_record["file_hash"] if last_record else "GENESIS"
-
-    # Timestamp TEK KAYNAK: backend
-    timestamp = datetime.now(timezone.utc).isoformat()
-
-    # Canonical message (tek format)
-    message = create_canonical_message(
-        file_name=payload.file_name,
-        file_hash=payload.file_hash,
-        prev_hash=prev_hash,
-        timestamp=timestamp
-    )
-
     # Signature zorunlu
     if not payload.public_key or not payload.signature:
         raise HTTPException(
             status_code=400,
             detail="public_key ve signature zorunludur."
         )
+
+    if not payload.timestamp:
+        raise HTTPException(
+            status_code=400,
+            detail="timestamp zorunludur. Önce /register/prepare çağrılmalıdır."
+        )
+
+    # Replay protection
+    if not check_replay_protection(payload.timestamp):
+        raise HTTPException(
+            status_code=401,
+            detail="Replay attack detected (timestamp expired)."
+        )
+
+    # DÜZELTME 2: prev_hash parametresi buradan kaldırıldı.
+    # verify_util.py artık 3 parametre bekliyor.
+    message = create_canonical_message(
+        file_name=payload.file_name,
+        file_hash=payload.file_hash,
+        timestamp=payload.timestamp
+    )
+    
+    logger.info("Verifying RSA signature for incoming record")
     
     # Signature verification
-    # NOTE: Since the Frontend (app.js) is in demo mode and cannot generate a real RSA key
-    # or sign the backend-side timestamp, we allow the demo key.
-    if payload.public_key.startswith("PREMIUM_USER"):
-        logger.warning(f"DEV SIGNATURE BYPASS for user: {payload.public_key}")
-    elif not verify_signature(
+    if not verify_signature(
         payload.public_key,
         message,
         payload.signature
@@ -78,27 +97,29 @@ def register_record(payload: RegisterRequest):
             status_code=401,
             detail="Invalid signature."
         )
-    
 
-    # Real Merkle root
+    # Previous hash (hash-chain) - ZİNCİR İÇİN HALA GEREKLİ
+    last_record = get_last_record()
+    prev_hash = last_record["file_hash"] if last_record else "GENESIS"
+
+    # Merkle root
     vault = SecurityVaultManager()
     merkle_root = vault.build_merkle_root(
         [payload.file_hash, prev_hash]
     )
 
-    # DB insert (timestamp ile)
+    # DB insert - ZİNCİR BURADA KURULUYOR (prev_hash ekleniyor)
     insert_record(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
         prev_hash=prev_hash,
-        user_key=payload.public_key,  # <--- CRITICAL FIX APPLIED HERE
+        user_key=payload.public_key,
         merkle_root=merkle_root,
-        timestamp=timestamp
+        timestamp=payload.timestamp
     )
 
     logger.info(f"New record registered: {payload.file_name}")
 
-    # Response
     r = get_last_record()
     return RecordOut(
         id=r["id"],
@@ -146,7 +167,6 @@ def audit():
             for r in records
         ]
     )
-
 
 @app.post(
     "/verify",

@@ -4,9 +4,15 @@ const API_BASE_URL = 'http://127.0.0.1:8000';
 
 // Global state for selected file
 let selectedFile = null;
+let userPrivateKey = null;
+let userPublicKeyPem = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     logToConsole("System Initialized...", "system");
+
+    //  RSA key üret (Browser Keystore)
+    await generateKeyPair();
+
 
     // --- 1. Matrix Background Init ---
     initMatrixRain();
@@ -56,7 +62,209 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = 'audit.html';
         });
     }
+
+    // Load Stats if on Dashboard
+    const totalRecordsDisplay = document.getElementById('total-records-display');
+    if (totalRecordsDisplay) {
+        loadDashboardStats();
+    }
 });
+
+// ==========================================
+// DASHBOARD STATS
+// ==========================================
+async function loadDashboardStats() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/audit`);
+        const data = await response.json();
+
+        // 1. Total Count
+        const countDiv = document.getElementById('total-records-display');
+        if (countDiv) {
+            countDiv.innerText = data.records.length;
+        }
+
+        // 2. Today's Count
+        const todayDiv = document.getElementById('today-stats-display');
+        if (todayDiv) {
+            // Get today's date in YYYY-MM-DD local format
+            const today = new Date().toLocaleDateString('en-CA');
+
+            const todayRecords = data.records.filter(r => {
+                const rDate = new Date(r.timestamp).toLocaleDateString('en-CA');
+                return rDate === today;
+            });
+
+            const count = todayRecords.length;
+            todayDiv.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> +${count} today`;
+        }
+
+        // 3. Integrity Check (System Health)
+        const integrityDiv = document.getElementById('integrity-score-display');
+        const lastAuditDiv = document.getElementById('last-audit-time-display');
+
+        if (integrityDiv) {
+            if (data.chain_valid) {
+                integrityDiv.innerText = "100%";
+                integrityDiv.style.color = "var(--success)";
+            } else {
+                integrityDiv.innerHTML = `<span style="font-size:2rem">FAIL</span>`;
+                integrityDiv.style.color = "var(--error)";
+            }
+        }
+
+        if (lastAuditDiv) {
+            // Since we just called /audit, the check happened "Just now"
+            const time = new Date().toLocaleTimeString();
+            lastAuditDiv.innerText = `Last audit: ${time}`;
+        }
+
+        // 4. Live Hash Chain
+        renderLiveHashChain(data.records);
+
+        // 5. Activity Chart (Canvas)
+        renderActivityChart(data.records);
+
+    } catch (error) {
+        console.error("Failed to load stats", error);
+    }
+}
+
+function renderActivityChart(records) {
+    const canvas = document.getElementById('activityChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // 1. Prepare Data Buckets (Last 7 Days)
+    const days = 7;
+    const counts = new Array(days).fill(0);
+    const now = new Date();
+
+    // Create Date Labels for comparison
+    const labels = [];
+    for (let i = 0; i < days; i++) {
+        const d = new Date();
+        d.setDate(now.getDate() - (days - 1 - i));
+        labels.push(d.toLocaleDateString('en-CA'));
+    }
+
+    // Bucket records
+    records.forEach(r => {
+        const rDate = new Date(r.timestamp).toLocaleDateString('en-CA');
+        const idx = labels.indexOf(rDate);
+        if (idx !== -1) {
+            counts[idx]++;
+        }
+    });
+
+    // Normalize for scaling chart
+    const maxVal = Math.max(...counts, 1); // Avoid division by zero
+
+    // Draw Line
+    ctx.beginPath();
+    ctx.strokeStyle = '#00f0ff'; // Primary Cyan
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const stepX = width / (days - 1);
+
+    counts.forEach((count, i) => {
+        const x = i * stepX;
+        // Invert Y axis (canvas 0 is top)
+        // Normalize height: (count / max) * height
+        // Add 5px padding from top/bottom
+        const y = height - ((count / maxVal) * (height - 10)) - 5;
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+
+    ctx.stroke();
+
+    // Gradient Fill
+    ctx.lineTo(width, height);
+    ctx.lineTo(0, height);
+    ctx.closePath();
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(0, 240, 255, 0.2)');
+    gradient.addColorStop(1, 'rgba(0, 240, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw dots
+    counts.forEach((count, i) => {
+        const x = i * stepX;
+        const y = height - ((count / maxVal) * (height - 10)) - 5;
+
+        ctx.beginPath();
+        ctx.fillStyle = '#fff';
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+function renderLiveHashChain(records) {
+    const container = document.getElementById('live-chain-container');
+    if (!container) return; // Not on dashboard
+
+    container.innerHTML = '';
+
+    // Sort Newest First & Take Top 5
+    const latestBlocks = records.sort((a, b) => b.id - a.id).slice(0, 5);
+
+    if (latestBlocks.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-muted); padding:1rem;">No blocks mined yet. Register a file to start the chain.</div>`;
+        return;
+    }
+
+    latestBlocks.forEach((block, index) => {
+        // Block Card
+        const blockDiv = document.createElement('div');
+        blockDiv.style.cssText = `
+            min-width: 140px; 
+            height: 140px; 
+            background: rgba(0,0,0,0.3); 
+            border: 1px solid ${index === 0 ? 'var(--primary-cyan)' : 'rgba(255,255,255,0.1)'}; 
+            border-radius: 12px; 
+            padding: 1rem; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            position: relative;
+            transition: all 0.3s ease;
+        `;
+
+        // Hover effect via JS since inline styles are tricky for pseudo-classes
+        blockDiv.onmouseenter = () => { blockDiv.style.transform = 'translateY(-5px)'; blockDiv.style.borderColor = 'var(--primary-cyan)'; };
+        blockDiv.onmouseleave = () => { blockDiv.style.transform = 'translateY(0)'; blockDiv.style.borderColor = index === 0 ? 'var(--primary-cyan)' : 'rgba(255,255,255,0.1)'; };
+
+        blockDiv.innerHTML = `
+            <span style="font-size: 0.7rem; color: ${index === 0 ? 'var(--primary-cyan)' : 'var(--text-muted)'};">#${block.id}</span>
+            <div style="font-family: monospace; font-size: 0.6rem; color: var(--text-muted); word-break: break-all;" title="${block.file_hash}">
+                ${block.file_hash.substring(0, 10)}...
+            </div>
+            <i class="fa-solid fa-link" style="align-self: flex-end; color: ${index === 0 ? 'var(--success)' : 'var(--text-muted)'};"></i>
+        `;
+
+        container.appendChild(blockDiv);
+
+        // Arrow (only if not the last item in our slice)
+        if (index < latestBlocks.length - 1) {
+            const arrow = document.createElement('i');
+            arrow.className = "fa-solid fa-arrow-right";
+            arrow.style.cssText = "color: rgba(255,255,255,0.1); font-size: 0.8rem;";
+            container.appendChild(arrow);
+        }
+    });
+}
 
 // ==========================================
 // SHA-256 Hashing (Browser Native - SubtleCrypto)
@@ -103,54 +311,71 @@ function setupUploadPage(dropZone) {
 
 // Actual Logic moved to separate function
 async function processRegistration(dropZone, file) {
-    // Visual Feedback
     updateDropZoneStatus(dropZone, 'processing', 'Calculating Hash & Signing...');
 
     try {
-        // 1. Calculate Hash
+        // 1️⃣ Calculate Hash
         const fileHash = await calculateFileHash(file);
         logToConsole(`Hash Calculated: ${fileHash.substring(0, 10)}...`, "success");
 
-        // 2. Generate Mock User Key & Signature (In real app, this comes from a Wallet)
-        const mockPublicKey = "PREMIUM_USER_KEY_XYZ_123";
-        const mockSignature = btoa("valid_rsa_signature_mock_" + Date.now());
-        logToConsole("Generating RSA-2048 Signature...", "system");
-
-        // 3. Send to Backend
-        const payload = {
-            file_name: file.name,
-            file_hash: fileHash,
-            public_key: mockPublicKey,
-            signature: mockSignature
-        };
-
-        logToConsole("Sending encrypted payload to Vault...", "system");
-        const response = await fetch(`${API_BASE_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+        // 2️⃣ PREPARE — canonical message al
+        const prepResp = await fetch(`${API_BASE_URL}/register/prepare`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                file_name: file.name,
+                file_hash: fileHash
+            })
         });
 
-        if (response.ok) {
-            const result = await response.json();
-            updateDropZoneStatus(dropZone, 'success', `Registered! ID: #${result.id}`);
-            logToConsole(`SUCCESS: Block #${result.id} mined.`, "success");
+        if (!prepResp.ok) {
+            throw new Error("Prepare step failed");
+        }
 
-            // Reset selection after success (optional)
-            selectedFile = null;
-            const btn = document.getElementById('btn-register-manual');
-            if (btn) {
-                btn.innerHTML = `<i class="fa-solid fa-check"></i> Registered Successfully`;
-                setTimeout(() => {
-                    btn.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Sign & Register Record`;
-                    btn.style.opacity = '0.5';
-                    btn.style.cursor = 'not-allowed';
-                }, 4000);
-            }
+        const prep = await prepResp.json();
 
-        } else {
+        // 3️⃣ SIGN — Browser Keystore (REAL RSA)
+        logToConsole("Signing canonical message with RSA-PSS...", "system");
+        if (!userPrivateKey) {
+            throw new Error("Cryptographic key not initialized");
+        }
+        const signature = await signCanonicalMessage(
+            prep.canonical_message
+        );
+
+        // 4️⃣ REGISTER
+        const response = await fetch(`${API_BASE_URL}/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                file_name: file.name,
+                file_hash: fileHash,
+                public_key: userPublicKeyPem,
+                signature: signature,
+                timestamp: prep.timestamp
+            })
+        });
+
+        if (!response.ok) {
             const err = await response.json();
             throw new Error(err.detail || "Registration failed");
+        }
+
+        const result = await response.json();
+
+        updateDropZoneStatus(dropZone, 'success', `Registered! ID: #${result.id}`);
+        logToConsole(`SUCCESS: Block #${result.id} registered with valid RSA signature.`, "success");
+
+        // UI reset
+        selectedFile = null;
+        const btn = document.getElementById('btn-register-manual');
+        if (btn) {
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> Registered Successfully`;
+            setTimeout(() => {
+                btn.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Sign & Register Record`;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            }, 4000);
         }
 
     } catch (error) {
@@ -159,6 +384,7 @@ async function processRegistration(dropZone, file) {
         logToConsole(`ERROR: ${error.message}`, "error");
     }
 }
+
 
 // ==========================================
 // VERIFY PAGE LOGIC
@@ -210,14 +436,15 @@ function setupVerifyPage(dropZone) {
                             <div>
                                 <h4 style="color: var(--error); margin-bottom: 0.25rem;">Verification Failed</h4>
                                 <p style="font-size: 0.9rem; color: var(--text-muted);">
-                                    This file hash was NOT found in the immutable ledger.
+                                    This file hash was NOT found in the immutable ledger.<br>
+                                    <span style="color: rgba(255,100,100,0.8); font-size: 0.8rem;">(The file may have been modified or tampered with)</span>
                                 </p>
                             </div>
                         </div>
                      `;
                     resultArea.style.borderColor = 'rgba(255, 0, 85, 0.3)';
                     resultArea.style.background = 'rgba(255, 0, 85, 0.05)';
-                    updateDropZoneStatus(dropZone, 'error', 'Not Found');
+                    updateDropZoneStatus(dropZone, 'error', 'Not Found (Modified?)');
                     logToConsole("ALERT: No match in ledger.", "error");
                 }
             } else {
@@ -243,27 +470,26 @@ function setupVerifyPage(dropZone) {
 // ==========================================
 // AUDIT PAGE LOGIC
 // ==========================================
+// ==========================================
+// AUDIT PAGE LOGIC
+// ==========================================
+let globalAuditRecords = [];
+let currentAuditPage = 1;
+const AUDIT_ITEMS_PER_PAGE = 10;
+
 async function loadAuditChain() {
     logToConsole("Syncing with Immutable Ledger...", "system");
     try {
         const response = await fetch(`${API_BASE_URL}/audit`);
         const data = await response.json();
 
-        const tbody = document.getElementById('auditTableBody');
-        tbody.innerHTML = '';
+        // 1. Store Data Reverse Chronological (Newest First)
+        globalAuditRecords = data.records.sort((a, b) => b.id - a.id);
 
-        data.records.forEach(record => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td style="color: var(--primary-cyan);">#${record.id}</td>
-                <td>${new Date(record.timestamp).toLocaleString()}</td>
-                <td><span class="status-badge status-valid"><i class="fa-solid fa-cube"></i> Block</span></td>
-                <td>${record.file_name}</td>
-                <td class="hash-cell" title="${record.file_hash}">${record.file_hash.substring(0, 10)}...</td>
-                <td><span class="status-badge status-success">Valid</span></td>
-            `;
-            tbody.appendChild(row);
-        });
+        // 2. Render First Page
+        currentAuditPage = 1;
+        renderAuditTable();
+
         logToConsole(`Sync Complete. ${data.records.length} blocks loaded.`, "success");
 
     } catch (error) {
@@ -272,7 +498,61 @@ async function loadAuditChain() {
     }
 }
 
+function renderAuditTable() {
+    const tbody = document.getElementById('auditTableBody');
+    if (!tbody) return;
 
+    tbody.innerHTML = '';
+
+    // Pagination Calculation
+    const start = (currentAuditPage - 1) * AUDIT_ITEMS_PER_PAGE;
+    const end = start + AUDIT_ITEMS_PER_PAGE;
+    const pageRecords = globalAuditRecords.slice(start, end);
+    const totalPages = Math.ceil(globalAuditRecords.length / AUDIT_ITEMS_PER_PAGE) || 1;
+
+    // Render Rows
+    pageRecords.forEach(record => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td style="color: var(--primary-cyan);">#${record.id}</td>
+            <td>${new Date(record.timestamp).toLocaleString()}</td>
+            <td><span class="status-badge status-valid"><i class="fa-solid fa-cube"></i> Block</span></td>
+            <td>${record.file_name}</td>
+            <td class="hash-cell" title="${record.file_hash}">${record.file_hash.substring(0, 10)}...</td>
+            <td><span class="status-badge status-success">Valid</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Update Pagination UI
+    const pageInfo = document.getElementById('page-info');
+    const btnPrev = document.getElementById('btn-audit-prev');
+    const btnNext = document.getElementById('btn-audit-next');
+
+    if (pageInfo) pageInfo.innerText = `Page ${currentAuditPage} of ${totalPages}`;
+
+    if (btnPrev) {
+        btnPrev.disabled = currentAuditPage === 1;
+        btnPrev.style.opacity = currentAuditPage === 1 ? '0.3' : '1';
+        btnPrev.onclick = () => {
+            if (currentAuditPage > 1) {
+                currentAuditPage--;
+                renderAuditTable();
+            }
+        };
+    }
+
+    if (btnNext) {
+        btnNext.disabled = currentAuditPage === totalPages;
+        btnNext.style.opacity = currentAuditPage === totalPages ? '0.3' : '1';
+        btnNext.onclick = () => {
+            if (currentAuditPage < totalPages) {
+                currentAuditPage++;
+                renderAuditTable();
+            }
+        };
+    }
+}
 // ==========================================
 // HELPERS (UI & EVENTS)
 // ==========================================
@@ -311,6 +591,57 @@ function setupDragAndDrop(element, onFileDrop) {
         }
         input.click();
     });
+}
+//generate RSA Key Pair in Browser Keystore
+async function generateKeyPair() {
+    const keyPair = await crypto.subtle.generateKey(
+        {
+            name: "RSA-PSS",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: "SHA-256"
+        },
+        false, // private key EXPORT EDİLEMEZ
+        ["sign", "verify"]
+    );
+
+    userPrivateKey = keyPair.privateKey;
+
+    // Public key export (SPKI)
+    const spki = await crypto.subtle.exportKey(
+        "spki",
+        keyPair.publicKey
+    );
+
+    userPublicKeyPem = spkiToPem(spki);
+
+    console.log("RSA key pair generated in browser keystore");
+}
+
+function spkiToPem(spkiBuffer) {
+    const b64 = btoa(
+        String.fromCharCode(...new Uint8Array(spkiBuffer))
+    );
+    const lines = b64.match(/.{1,64}/g).join("\n");
+    return `-----BEGIN PUBLIC KEY-----\n${lines}\n-----END PUBLIC KEY-----`;
+}
+
+async function signCanonicalMessage(message) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(message);
+
+    const signature = await crypto.subtle.sign(
+        {
+            name: "RSA-PSS",
+            saltLength: 32
+        },
+        userPrivateKey,
+        data
+    );
+
+    return btoa(
+        String.fromCharCode(...new Uint8Array(signature))
+    );
 }
 
 function updateDropZoneStatus(dropZone, status, message) {

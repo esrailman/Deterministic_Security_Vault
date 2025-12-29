@@ -1,34 +1,44 @@
-from typing import List, Dict
-
 class ChainValidator:
     """
-    Validates the mathematical integrity of the hash chain.
+    Zincir doğrulama işlemlerini yürüten statik sınıf.
     """
     
     @staticmethod
-    def validate_chain(records: List[Dict]) -> Dict:
+    def validate_chain(records):
         """
-        Scans the record list for chain breaks.
-        Returns: {"is_valid": bool, "broken_indices": List[int]}
+        Veritabanındaki kayıtları (liste halinde dict veya sqlite3.Row) alır ve zinciri doğrular.
         """
         broken_indices = []
         
-        if len(records) < 2:
+        # Kayıt yoksa veya tek kayıt varsa geçerli say
+        if not records:
             return {"is_valid": True, "broken_indices": []}
 
+        # Döngüye 1. indexten başlıyoruz (Genesis'i atla)
         for i in range(1, len(records)):
-            current = records[i]
-            prev = records[i-1]
+            current_record = records[i]
+            previous_record = records[i-1]
             
-            # Does the record's claimed previous hash (prev_hash) 
-            # match the actual hash of the previous record (file_hash)?
-            prev_hash_claim = current.get("prev_hash")
-            actual_prev_hash = prev.get("file_hash")
-            
-            if prev_hash_claim != actual_prev_hash:
-                broken_indices.append(current.get("id"))
+            # .get() yerine [] kullanıyoruz (sqlite3.Row uyumluluğu için)
+            try:
+                # Bir önceki kaydın hash'i
+                expected_prev_hash = previous_record["file_hash"]
                 
+                # Şu anki kaydın iddia ettiği 'prev_hash'
+                actual_prev_hash = current_record["prev_hash"]
+                
+                # Zincir Kontrolü
+                if expected_prev_hash != actual_prev_hash:
+                    broken_indices.append(current_record["id"])
+                    
+            except (KeyError, IndexError, TypeError):
+                # Eğer veri yapısında bir bozukluk varsa bunu da hata sayabiliriz
+                # Şimdilik güvenli tarafta kalıp o kaydı işaretliyoruz
+                broken_indices.append(current_record["id"] if "id" in current_record else i)
+
+        is_valid = len(broken_indices) == 0
+        
         return {
-            "is_valid": len(broken_indices) == 0,
+            "is_valid": is_valid,
             "broken_indices": broken_indices
         }

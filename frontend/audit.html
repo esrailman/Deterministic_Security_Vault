@@ -90,12 +90,18 @@
             </div>
 
             <!-- Pagination (Visual) -->
-            <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; color: var(--text-muted);">
-                <span><i class="fa-solid fa-chevron-left"></i> Prev</span>
-                <span style="color: var(--primary-cyan);">1</span>
-                <span>2</span>
-                <span>3</span>
-                <span>Next <i class="fa-solid fa-chevron-right"></i></span>
+            <!-- Pagination (Visual) -->
+            <div
+                style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; color: var(--text-muted); align-items: center;">
+                <button id="btn-audit-prev" class="btn"
+                    style="background:none; border:none; color:inherit; cursor:pointer; opacity:0.5;">
+                    <i class="fa-solid fa-chevron-left"></i> Prev
+                </button>
+                <span id="page-info" style="color: var(--primary-cyan); font-weight:bold;">Page 1</span>
+                <button id="btn-audit-next" class="btn"
+                    style="background:none; border:none; color:inherit; cursor:pointer; opacity:0.5;">
+                    Next <i class="fa-solid fa-chevron-right"></i>
+                </button>
             </div>
         </div>
     </div>

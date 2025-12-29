@@ -116,3 +116,4 @@ def get_record_by_hash(file_hash: str):
 
     conn.close()
     return row
+

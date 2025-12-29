@@ -1,17 +1,13 @@
-from datetime import timezone
+from datetime import timezone, datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import init_db
 from backend.database import get_records, verify_chain
 from backend.logger import logger
-from backend.schemas import AuditResponse, RecordOut, RegisterRequest, VerifyRequest, VerifyResponse
+from backend.schemas import AuditResponse, RecordOut, RegisterRequest, VerifyRequest, VerifyResponse, PrepareRegisterRequest
 from backend.database import insert_record, get_last_record, get_record_by_hash
-from datetime import datetime
-from fastapi import HTTPException
-from CryptoModule.verify_util import (create_canonical_message,verify_signature,)
+from CryptoModule.verify_util import create_canonical_message, verify_signature, check_replay_protection
 from CryptoModule.security_engine import SecurityVaultManager
-from backend.schemas import PrepareRegisterRequest
-from CryptoModule.verify_util import check_replay_protection
 
 app = FastAPI(
     title="Deterministic Security Vault API",
@@ -36,15 +32,13 @@ init_db()
 
 @app.post("/register/prepare")
 def prepare_register(payload: PrepareRegisterRequest):
-    last_record = get_last_record()
-    prev_hash = last_record["file_hash"] if last_record else "GENESIS"
-
+    # Prepare aşamasında timestamp üretiyoruz ama prev_hash imzaya girmiyor artık.
     timestamp = datetime.now(timezone.utc).isoformat()
 
+    # DÜZELTME 1: prev_hash parametresi kaldırıldı
     canonical_message = create_canonical_message(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
-        prev_hash=prev_hash,
         timestamp=timestamp
     )
 
@@ -83,20 +77,17 @@ def register_record(payload: RegisterRequest):
             detail="Replay attack detected (timestamp expired)."
         )
 
-    # Previous hash (hash-chain)
-    last_record = get_last_record()
-    prev_hash = last_record["file_hash"] if last_record else "GENESIS"
-
-    # Canonical message (AYNI FORMAT)
+    # DÜZELTME 2: prev_hash parametresi buradan kaldırıldı.
+    # verify_util.py artık 3 parametre bekliyor.
     message = create_canonical_message(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
-        prev_hash=prev_hash,
         timestamp=payload.timestamp
     )
+    
     logger.info("Verifying RSA signature for incoming record")
-    # Signature verification (bypass şimdilik duruyor)
-    # Signature verification (REAL MODE)
+    
+    # Signature verification
     if not verify_signature(
         payload.public_key,
         message,
@@ -107,13 +98,17 @@ def register_record(payload: RegisterRequest):
             detail="Invalid signature."
         )
 
+    # Previous hash (hash-chain) - ZİNCİR İÇİN HALA GEREKLİ
+    last_record = get_last_record()
+    prev_hash = last_record["file_hash"] if last_record else "GENESIS"
+
     # Merkle root
     vault = SecurityVaultManager()
     merkle_root = vault.build_merkle_root(
         [payload.file_hash, prev_hash]
     )
 
-    # DB insert
+    # DB insert - ZİNCİR BURADA KURULUYOR (prev_hash ekleniyor)
     insert_record(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
@@ -133,8 +128,6 @@ def register_record(payload: RegisterRequest):
         prev_hash=r["prev_hash"],
         timestamp=r["timestamp"]
     )
-
-
 
 @app.get("/ping")
 def ping():
@@ -174,7 +167,6 @@ def audit():
             for r in records
         ]
     )
-
 
 @app.post(
     "/verify",

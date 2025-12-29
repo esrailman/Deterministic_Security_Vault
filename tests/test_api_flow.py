@@ -1,131 +1,127 @@
 import unittest
 import os
 import sqlite3
-import unittest.mock
+import base64
+import hashlib
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
-
 from backend.main import app
 from backend.database import DB_PATH, init_db
-
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 
 # Veritabanını test için temizle
 def clear_db():
     if os.path.exists(DB_PATH):
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM records")
-        conn.commit()
-        conn.close()
-
+        try:
+            os.remove(DB_PATH)
+        except PermissionError:
+            pass # Windows bazen dosyayı tutabilir
 
 class TestAPIFlow(unittest.TestCase):
     def setUp(self):
         # Her testten önce temiz bir başlangıç yap
         self.client = TestClient(app)
-        init_db()
         clear_db()
+        init_db()
+        
+        # ---------------------------------------------------------
+        # KRİTİK: Test için GERÇEK bir RSA anahtar çifti üretiyoruz.
+        # Mock kullanmıyoruz, gerçek imza atacağız.
+        # ---------------------------------------------------------
+        self.private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        self.public_key_pem = self.private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        ).decode('utf-8')
 
-    def _prepare(self, file_name: str, file_hash: str) -> dict:
+    def create_signed_payload(self, file_name, file_hash):
         """
-        /register/prepare çağrısı yapıp canonical_message + timestamp döndürür.
+        Yardımcı Fonksiyon: 
+        Frontend'in yaptığı işi taklit eder.
+        Canonical Message oluşturur ve RSA ile imzalar.
         """
-        # NOTE: Yeni mimaride register'dan önce prepare zorunlu olduğu için eklendi.
-        resp = self.client.post("/register/prepare", json={
+        # 1. Timestamp İstemci Tarafında Üretiliyor
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        # 2. Canonical Message (Standardımız: file_name|file_hash|timestamp)
+        # prev_hash imzaya dahil EDİLMİYOR.
+        message = f"{file_name}|{file_hash}|{timestamp}"
+        
+        # 3. Gerçek İmza Atma (RSA-PSS)
+        signature = self.private_key.sign(
+            message.encode('utf-8'),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        sig_b64 = base64.b64encode(signature).decode('utf-8')
+        
+        # 4. Hazır Payload Döndür
+        return {
             "file_name": file_name,
-            "file_hash": file_hash
-        })
-        self.assertEqual(resp.status_code, 200, f"Prepare failed: {resp.text}")  # NOTE
-        return resp.json()
+            "file_hash": file_hash,
+            "public_key": self.public_key_pem,
+            "signature": sig_b64,
+            "timestamp": timestamp  # Zorunlu alan
+        }
 
     def test_dynamic_merkle_root(self):
         """
-        Dinamik Merkle Root + Hash Chain bağlantısını test eder.
-
-        NOT: Bu test kripto doğrulamasını (RSA doğrulama + replay protection)
-        gerçek anahtarlarla yapmak yerine mock'lar.
-        Çünkü bu testin amacı kripto değil, zincir/merkle davranışını doğrulamak.
+        Dinamik Merkle Root ve Hash Chain test eder.
+        Bunu yaparken MOCK KULLANMAZ, gerçek imza ile register olur.
         """
+        
+        # ------------------------------------------------
+        # 1. Dosya Kaydı (Genesis)
+        # ------------------------------------------------
+        payload1 = self.create_signed_payload("dosya1.txt", "aaaa1111")
+        response1 = self.client.post("/register", json=payload1)
+        
+        # Hata varsa detayını görelim
+        if response1.status_code != 200:
+            print(f"\n[HATA DETAYI 1] {response1.text}")
+            
+        self.assertEqual(response1.status_code, 200)
+        
+        # Merkle Root Kontrolü (DB'den)
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT merkle_root FROM records WHERE file_hash=?", ("aaaa1111",))
+        db_root1 = cur.fetchone()[0]
+        
+        print(f"\n[Test] Kayıt 1 Merkle Root: {db_root1}")
+        self.assertNotEqual(db_root1, "root", "HATA: Merkle Root statik kalmış!")
 
-        # NOTE: Yeni mimaride verify_signature ZORUNLU olduğu için mock'lanıyor.
-        # NOTE: Yeni mimaride replay protection (check_replay_protection) da devrede olduğu için mock'lanıyor.
-        with unittest.mock.patch("backend.main.verify_signature", return_value=True), \
-             unittest.mock.patch("backend.main.check_replay_protection", return_value=True):
+        # ------------------------------------------------
+        # 2. Dosya Kaydı (Zincire Ekleme)
+        # ------------------------------------------------
+        payload2 = self.create_signed_payload("dosya2.txt", "bbbb2222")
+        response2 = self.client.post("/register", json=payload2)
+        
+        if response2.status_code != 200:
+            print(f"\n[HATA DETAYI 2] {response2.text}")
 
-            # 1) Dosya Kaydı (Genesis)
-            file1_name = "dosya1.txt"
-            file1_hash = "aaaa1111"
+        self.assertEqual(response2.status_code, 200)
+        
+        cur.execute("SELECT merkle_root, prev_hash FROM records WHERE file_hash=?", ("bbbb2222",))
+        row2 = cur.fetchone()
+        db_root2 = row2[0]
+        prev_hash2 = row2[1]
+        conn.close()
 
-            prep1 = self._prepare(file1_name, file1_hash)  # NOTE: prepare adımı eklendi
+        print(f"[Test] Kayıt 2 Merkle Root: {db_root2}")
 
-            payload1 = {
-                "file_name": file1_name,
-                "file_hash": file1_hash,
-                "public_key": "mock_public_key",
-                "signature": "mock_signature",
-                "timestamp": prep1["timestamp"]  # NOTE: Yeni mimaride timestamp zorunlu
-            }
+        # ------------------------------------------------
+        # KONTROLLER
+        # ------------------------------------------------
+        # 1. Root değişti mi?
+        self.assertNotEqual(db_root1, db_root2, "HATA: Merkle Root dinamik değil!")
+        
+        # 2. Zincir bağlı mı? (Kayit 2'nin prev_hash'i, Kayit 1'in file_hash'i olmalı)
+        self.assertEqual(prev_hash2, "aaaa1111", "HATA: Zincir kopuk!")
 
-            response1 = self.client.post("/register", json=payload1)
-
-            if response1.status_code != 200:
-                print(f"\n[HATA DETAYI] Status: {response1.status_code}, Body: {response1.text}")
-
-            self.assertEqual(response1.status_code, 200)
-
-            # Merkle Root Kontrolü (DB'den)
-            conn = sqlite3.connect(DB_PATH)
-            cur = conn.cursor()
-            cur.execute("SELECT merkle_root FROM records WHERE file_hash=?", (file1_hash,))
-            row1 = cur.fetchone()
-            self.assertIsNotNone(row1, "Record 1 DB insert failed")  # NOTE: ekstra güvenlik kontrolü
-            db_root1 = row1[0]
-
-            print(f"\n[Test] Kayıt 1 Merkle Root: {db_root1}")
-            self.assertNotEqual(
-                db_root1,
-                "root",
-                "HATA: Merkle Root hala statik 'root' olarak atanıyor!"
-            )
-
-            # 2) Dosya Kaydı (Zincire Ekleme)
-            file2_name = "dosya2.txt"
-            file2_hash = "bbbb2222"
-
-            prep2 = self._prepare(file2_name, file2_hash)  # NOTE: prepare adımı eklendi
-
-            payload2 = {
-                "file_name": file2_name,
-                "file_hash": file2_hash,
-                "public_key": "mock_public_key",
-                "signature": "mock_signature",
-                "timestamp": prep2["timestamp"]  # NOTE: timestamp zorunlu
-            }
-
-            response2 = self.client.post("/register", json=payload2)
-            self.assertEqual(response2.status_code, 200, f"Register 2 failed: {response2.text}")  # NOTE
-
-            cur.execute("SELECT merkle_root, prev_hash FROM records WHERE file_hash=?", (file2_hash,))
-            row2 = cur.fetchone()
-            self.assertIsNotNone(row2, "Record 2 DB insert failed")  # NOTE: ekstra kontrol
-            db_root2, prev_hash2 = row2[0], row2[1]
-            conn.close()
-
-            print(f"[Test] Kayıt 2 Merkle Root: {db_root2}")
-
-            # KONTROLLER
-            self.assertNotEqual(
-                db_root1,
-                db_root2,
-                "HATA: Yeni kayıt eklendiğinde Merkle Root değişmedi!"
-            )
-
-            # NOTE: prev_hash tasarımında 'prev_hash' bir önceki kaydın file_hash'ine eşit olmalı
-            self.assertEqual(
-                prev_hash2,
-                file1_hash,
-                "HATA: Zincir kopuk! prev_hash önceki kaydın file_hash'ine eşit değil."
-            )
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

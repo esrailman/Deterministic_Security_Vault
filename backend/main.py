@@ -1,13 +1,12 @@
 from datetime import timezone, datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from backend.database import init_db
-from backend.database import get_records, verify_chain
 from backend.logger import logger
 from backend.schemas import AuditResponse, RecordOut, RegisterRequest, VerifyRequest, VerifyResponse, PrepareRegisterRequest
-from backend.database import insert_record, get_last_record, get_record_by_hash
+from backend.database import init_db, insert_record, get_last_record, get_record_by_hash, get_records
 from CryptoModule.verify_util import create_canonical_message, verify_signature, check_replay_protection
 from CryptoModule.security_engine import SecurityVaultManager
+from CryptoModule.chain_validator import ChainValidator 
 
 app = FastAPI(
     title="Deterministic Security Vault API",
@@ -32,10 +31,9 @@ init_db()
 
 @app.post("/register/prepare")
 def prepare_register(payload: PrepareRegisterRequest):
-    # Prepare aşamasında timestamp üretiyoruz ama prev_hash imzaya girmiyor artık.
+    
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    # DÜZELTME 1: prev_hash parametresi kaldırıldı
     canonical_message = create_canonical_message(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
@@ -77,8 +75,6 @@ def register_record(payload: RegisterRequest):
             detail="Replay attack detected (timestamp expired)."
         )
 
-    # DÜZELTME 2: prev_hash parametresi buradan kaldırıldı.
-    # verify_util.py artık 3 parametre bekliyor.
     message = create_canonical_message(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
@@ -98,7 +94,7 @@ def register_record(payload: RegisterRequest):
             detail="Invalid signature."
         )
 
-    # Previous hash (hash-chain) - ZİNCİR İÇİN HALA GEREKLİ
+    # Previous hash (hash-chain) 
     last_record = get_last_record()
     prev_hash = last_record["file_hash"] if last_record else "GENESIS"
 
@@ -108,7 +104,7 @@ def register_record(payload: RegisterRequest):
         [payload.file_hash, prev_hash]
     )
 
-    # DB insert - ZİNCİR BURADA KURULUYOR (prev_hash ekleniyor)
+    # DB insert - ZİNCİR BURADA KURULUYOR 
     insert_record(
         file_name=payload.file_name,
         file_hash=payload.file_hash,
@@ -146,7 +142,9 @@ def health():
 )
 def audit():
     records = get_records()
-    chain_valid, broken = verify_chain()
+    val_result = ChainValidator.validate_chain(records)
+    chain_valid = val_result["is_valid"]
+    broken = val_result["broken_indices"]
 
     logger.info("Audit endpoint called")
 

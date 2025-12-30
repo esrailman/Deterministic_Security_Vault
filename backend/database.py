@@ -83,27 +83,6 @@ def get_records():
     return rows
 
 
-def verify_chain():
-    """
-    Checks the consistency of the hash chain.
-    """
-    records = get_records()
-
-    if not records or len(records) == 1:
-        return True, []
-
-    broken_records = []
-
-    for i in range(1, len(records)):
-        prev_record = records[i - 1]
-        current_record = records[i]
-
-        if current_record["prev_hash"] != prev_record["file_hash"]:
-            broken_records.append(current_record["id"])
-
-    return len(broken_records) == 0, broken_records
-
-
 def get_record_by_hash(file_hash: str):
     """
     Returns the record with the specified file_hash.
